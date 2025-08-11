@@ -23,29 +23,45 @@ function Product() {
   const [thumbsSwiper, setThumbsSwiper] = useState(null);
   const [activeTab, setActiveTab] = useState('description');
 
-  // getByPermalink funksiyasını useMemo ilə yadda saxlayaq
+  // Yeni: bütün məhsulları saxlayacaq state və bənzər məhsullar
+  const [allProducts, setAllProducts] = useState([]);
+  const [similarProducts, setSimilarProducts] = useState([]);
+
+  // Modal və sürətli görünüş üçün minimal state (əvvəl undefined idi)
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState(null);
+  const modalRef = useRef(null);
+  const swiperRef = useRef(null);
+  const [isFirstSlide, setIsFirstSlide] = useState(true);
+  const [isLastSlide, setIsLastSlide] = useState(false);
+
+  const productSwiperRef = useRef(null);
+  const [isBeginning, setIsBeginning] = useState(true);
+  const [isEnd, setIsEnd] = useState(false);
+  const [hoveredProductId, setHoveredProductId] = useState(null);
+  const [likedProductIds, setLikedProductIds] = useState({});
+  const [cartQuantities, setCartQuantities] = useState({});
+
+  // getByPermalink funksiyasını useCallback ilə yadda saxlayaq
   const getByPermalink = useCallback((searchPermalink) => {
     if (!product?.properties || !product?.characteristics) return null;
-    
-    // Check for permalink or title in properties
+
     const prop = product.properties.find(
       (p) => p.permalink === searchPermalink || (p.title && p.title.toLowerCase() === searchPermalink.toLowerCase())
     );
 
     if (!prop) {
-      // If not found, check characteristics directly for a case-insensitive title match
       const char = product.characteristics.find(
         (c) => c.title && c.title.toLowerCase() === searchPermalink.toLowerCase()
       );
       return char?.title ?? null;
     }
-    
-    // Find characteristic by property_id
+
     const ch = product.characteristics.find((c) => c.property_id === prop.id);
     return ch?.title ?? null;
   }, [product]);
 
-  // Məhsulu yüklə
+  // Məhsulları API-dən gətirən funksiya
   const getAllProducts = async () => {
     try {
       const res = await instance.get('/products');
@@ -56,6 +72,7 @@ function Product() {
     }
   };
 
+  // Məhsulu yüklə və ayrıca bütün məhsulları state-ə qoy
   useEffect(() => {
     const fetchProduct = async () => {
       if (!permalink) return;
@@ -63,14 +80,18 @@ function Product() {
       try {
         setLoading(true);
         const allProductsRaw = await getAllProducts();
+        // API-dən gələn data formatı nə olursa olsun array-ə çevirək
         const allItems = Array.isArray(allProductsRaw)
           ? allProductsRaw
           : Object.values(allProductsRaw).flat();
+
+        setAllProducts(allItems);
 
         const found = allItems.find((p) => p.permalink === permalink);
 
         if (found) {
           setProduct(found);
+
           const cart = JSON.parse(localStorage.getItem('cartProducts')) || [];
           const cartItem = cart.find((it) => it.id === found.id);
           setCartQuantity(cartItem?.quantity || 0);
@@ -89,6 +110,62 @@ function Product() {
 
     fetchProduct();
   }, [permalink]);
+
+  // Produkt state dəyişdikdən sonra bənzər məhsulları hesablamaq
+  useEffect(() => {
+    if (!product || allProducts.length === 0) {
+      setSimilarProducts([]);
+      return;
+    }
+
+    const findAuthor = (p) => {
+      const authorChar = p.characteristics?.find((c) => {
+        return c.permalink === 'avtor' || c.permalink === 'müəllif' || c.permalink === 'author';
+      });
+      return authorChar?.title || null;
+    };
+
+    const productAuthor = findAuthor(product);
+
+    const isSimilar = (p) => {
+      if (p.id === product.id) return false; // özünü çıxar
+
+      // Prioritet 1: eyni category_id varsa
+      if (product.category_id && p.category_id && product.category_id === p.category_id) return true;
+
+      // Prioritet 2: eyni əsas kateqoriya hiyerarşisi varsa (ilk səviyyə)
+      const prodMainCat = product.category_hierarchy?.[0];
+      const pMainCat = p.category_hierarchy?.[0];
+      if (prodMainCat && pMainCat && prodMainCat === pMainCat) return true;
+
+      // Prioritet 3: eyni müəllif varsa
+      const author = findAuthor(p);
+      if (productAuthor && author && productAuthor.toLowerCase() === author.toLowerCase()) return true;
+
+      // sənə uyğun daha çox şərt əlavə etmək olar (seriya, janr vs.)
+      return false;
+    };
+
+    const filtered = allProducts.filter(isSimilar);
+
+    // Sırala: mövcud olanlar birinci; sonra qiymət, sonra title
+    filtered.sort((a, b) => {
+      const aVariant = a.variants?.[0] || {};
+      const bVariant = b.variants?.[0] || {};
+      const aAvail = a.available && (aVariant.quantity || 0) > 0;
+      const bAvail = b.available && (bVariant.quantity || 0) > 0;
+
+      if (aAvail !== bAvail) return aAvail ? -1 : 1;
+
+      const aPrice = parseFloat(aVariant.price || 0);
+      const bPrice = parseFloat(bVariant.price || 0);
+      if (aPrice !== bPrice) return aPrice - bPrice;
+
+      return (a.title || '').localeCompare(b.title || '');
+    });
+
+    setSimilarProducts(filtered.slice(0, 20)); // maksimum 20 göstər
+  }, [product, allProducts]);
 
   // Səbətə əlavə/sil
   const updateCart = (delta) => {
@@ -181,11 +258,84 @@ function Product() {
   const publisher = getByPermalink('izdatelstvo') || getByPermalink('nəşriyyat') || getByPermalink('yayincilik');
   const author = getByPermalink('avtor') || getByPermalink('müəllif') || getByPermalink('author');
   const onlineSpecialPrice = getByPermalink('onlayna-ozel-qiymet');
-  
+
   const baseClass = 'flex items-center justify-center gap-1.5 px-4 py-2 rounded-md cursor-pointer transition-colors';
   const activeClass = 'bg-[#005bff] text-[#ffffff]';
   const inactiveClass = 'bg-[#f7f8fa] text-[#000000] hover:bg-[#005bff] hover:text-[#ffffff]';
-  
+
+  // Slayderin dəyişməsi zamanı arrowların aktivliyini yenilə
+  const handleSlideChange = (swiper) => {
+    setIsBeginning(swiper.isBeginning);
+    setIsEnd(swiper.isEnd);
+  };
+
+  // Sürətli görünüş modalı açmaq üçün (indi alert yerinə modal açır)
+  const openModal = (prod) => {
+    setSelectedProduct(prod);
+    setIsModalOpen(true);
+  };
+
+  const closeModal = () => {
+    setIsModalOpen(false);
+    setSelectedProduct(null);
+    // reset swiper ref ve indikatorlar
+    swiperRef.current = null;
+    setIsFirstSlide(true);
+    setIsLastSlide(false);
+  };
+
+  // Modal swiper init və slide change funksiyaları
+  const onSwiperInit = (s) => {
+    swiperRef.current = s;
+    setIsFirstSlide(s.isBeginning);
+    setIsLastSlide(s.isEnd);
+  };
+  const onSlideChange = (s) => {
+    setIsFirstSlide(s.isBeginning);
+    setIsLastSlide(s.isEnd);
+  };
+
+  // Sevimli toggl etmək (similar slider üçün)
+  const handleLikeToggle = (prod) => {
+    setLikedProductIds((prev) => {
+      const newLikes = { ...prev };
+      if (newLikes[prod.id]) {
+        delete newLikes[prod.id];
+      } else {
+        newLikes[prod.id] = true;
+      }
+      return newLikes;
+    });
+  };
+
+  // Səbətə əlavə etmək və miqdarı dəyişmək funksiyası (similar slider üçün)
+  const handleQuantityChange = (prod, delta) => {
+    setCartQuantities((prev) => {
+      const current = prev[prod.id] || 0;
+      const newCount = current + delta;
+      if (newCount < 0) return prev;
+      return { ...prev, [prod.id]: newCount };
+    });
+  };
+
+  // Birbaşa səbətə əlavə et (similar slider üçün)
+  const addToCart = (prod) => {
+    setCartQuantities((prev) => {
+      if (prev[prod.id]) return prev;
+      return { ...prev, [prod.id]: 1 };
+    });
+  };
+
+  // Modal daxilində məhsul miqdarı dəyişmək
+  const handleModalQuantityChange = (delta) => {
+    if (!selectedProduct) return;
+    setCartQuantities((prev) => {
+      const current = prev[selectedProduct.id] || 0;
+      const newCount = Math.max(0, current + delta);
+      return { ...prev, [selectedProduct.id]: newCount };
+    });
+  };
+
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -204,58 +354,6 @@ function Product() {
       </div>
     );
   }
-
-const productSwiperRef = useRef(null);
-  const [isBeginning, setIsBeginning] = useState(true);
-  const [isEnd, setIsEnd] = useState(false);
-  const [hoveredProductId, setHoveredProductId] = useState(null);
-  const [likedProductIds, setLikedProductIds] = useState({});
-  const [cartQuantities, setCartQuantities] = useState({});
-
-  // Slayderin dəyişməsi zamanı arrowların aktivliyini yenilə
-  const handleSlideChange = (swiper) => {
-    setIsBeginning(swiper.isBeginning);
-    setIsEnd(swiper.isEnd);
-  };
-
-  // Məhsulu sürətli görünüşdə göstərmək üçün modal açma (nümunə alert)
-  const openModal = (product) => {
-    alert(`Sürətli görünüş: ${product.title}`);
-  };
-
-  // Sevimli toggl etmək
-  const handleLikeToggle = (product) => {
-    setLikedProductIds((prev) => {
-      const newLikes = { ...prev };
-      if (newLikes[product.id]) {
-        delete newLikes[product.id];
-      } else {
-        newLikes[product.id] = true;
-      }
-      return newLikes;
-    });
-  };
-
-  // Səbətə əlavə etmək və miqdarı dəyişmək funksiyası
-  const handleQuantityChange = (product, delta) => {
-    setCartQuantities((prev) => {
-      const current = prev[product.id] || 0;
-      const newCount = current + delta;
-      if (newCount < 0) return prev;
-      return { ...prev, [product.id]: newCount };
-    });
-  };
-
-  // Birbaşa səbətə əlavə et
-  const addToCart = (product) => {
-    setCartQuantities((prev) => {
-      if (prev[product.id]) return prev;
-      return { ...prev, [product.id]: 1 };
-    });
-  };
-  
-
-
 
   return (
     <>
@@ -346,14 +444,14 @@ const productSwiperRef = useRef(null);
                 </SwiperSlide>
               ))}
             </Swiper>
-            
+
             <button className="swiper-button-prev-custom absolute left-2 lg:left-4 top-1/2 -translate-y-1/2 z-10 p-2 bg-white bg-opacity-70 hover:bg-opacity-100 rounded-full shadow-md transition-all duration-300 transform -translate-x-full opacity-0 group-hover:translate-x-0 group-hover:opacity-100 hidden lg:block">
               <GoArrowLeft className="text-xl lg:text-3xl text-gray-700" />
             </button>
             <button className="swiper-button-next-custom absolute right-2 lg:right-4 top-1/2 -translate-y-1/2 z-10 p-2 bg-white bg-opacity-70 hover:bg-opacity-100 rounded-full shadow-md transition-all duration-300 transform translate-x-full opacity-0 group-hover:translate-x-0 group-hover:opacity-100 hidden lg:block">
               <GoArrowRight className="text-xl lg:text-3xl text-gray-700" />
             </button>
-            
+
             <div className="custom-swiper-pagination flex justify-center mt-4 lg:hidden"></div>
           </div>
 
@@ -372,7 +470,7 @@ const productSwiperRef = useRef(null);
             }
           `}</style>
         </div>
-        
+
 
         {/* Məlumatlar (sağ) */}
         <div className="flex flex-col justify-start">
@@ -649,7 +747,7 @@ const productSwiperRef = useRef(null);
           <h2 className="text-[32px] font-normal">Bənzər məhsullar</h2>
           <div className="relative flex flex-col justify-start items-start group w-full max-w-[1428px] mx-auto px-10 lg:px-[64px] h-auto rounded-md">
             <div className="relative group mt-5 w-full max-w-[1400px] mx-auto">
-              {products.length > 0 ? (
+              {similarProducts.length > 0 ? (
                 <Swiper
                   onSwiper={(swiper) => {
                     productSwiperRef.current = swiper;
@@ -673,56 +771,57 @@ const productSwiperRef = useRef(null);
                     1280: { slidesPerView: 5, spaceBetween: 30 },
                   }}
                 >
-                  {products.map((product) => {
-                    const variant = product.variants?.[0] || {};
-                    const oldPrice = parseFloat(variant.old_price || 0);
-                    const newPrice = parseFloat(variant.price || 0);
-                    const hasDiscount = oldPrice > newPrice && oldPrice > 0;
-                    const discountPercent = hasDiscount
-                      ? Math.round(((oldPrice - newPrice) / oldPrice) * 100)
+                  {similarProducts.map((prod) => {
+                    const variant = prod.variants?.[0] || {};
+                    const oldPriceNum = parseFloat(variant.old_price || 0);
+                    const newPriceNum = parseFloat(variant.price || 0);
+                    const prodHasDiscount = oldPriceNum > newPriceNum && oldPriceNum > 0;
+                    const prodDiscountPercent = prodHasDiscount
+                      ? Math.round(((oldPriceNum - newPriceNum) / oldPriceNum) * 100)
                       : 0;
-                    const hasExpress = product.characteristics?.some(
+                    const hasExpress = prod.characteristics?.some(
                       (char) => char.permalink === 'ekspress'
                     );
-                    const secondImage = product.images?.find((img) => img.position === 2)?.original_url;
-                    const isLiked = likedProductIds[product.id];
-                    const currentQuantity = cartQuantities[product.id] || 0;
-                    const isOutOfStock = variant.quantity === 0 || !product.available;
-    
+                    const secondImage = prod.images?.find((img) => img.position === 2)?.original_url;
+                    const likedLocal = likedProductIds[prod.id];
+                    const currentQuantity = cartQuantities[prod.id] || 0;
+                    const prodVariant = prod.variants?.[0] || {};
+                    const isProdOutOfStock = prodVariant.quantity === 0 || !prod.available;
+
                     return (
-                      <SwiperSlide key={product.id || `product-${Math.random()}`}>
+                      <SwiperSlide key={prod.id || `product-${Math.random()}`}>
                         <article
                           className="flex flex-col w-full h-full rounded overflow-hidden bg-[#ffffff] relative cursor-pointer"
-                          onMouseEnter={() => setHoveredProductId(product.id)}
+                          onMouseEnter={() => setHoveredProductId(prod.id)}
                           onMouseLeave={() => setHoveredProductId(null)}
                         >
                           <div
                             className={`absolute bottom-40 left-0 right-0 flex items-center justify-center transition-opacity duration-300 z-10 ${
-                              hoveredProductId === product.id ? 'opacity-100' : 'opacity-0'
+                              hoveredProductId === prod.id ? 'opacity-100' : 'opacity-0'
                             }`}
                           >
                             <button
                               className="w-full h-auto bg-[#eeeeeee6] text-[#000000] font-medium py-1.5 px-6 rounded-md cursor-pointer"
-                              onClick={() => openModal(product)}
+                              onClick={() => openModal(prod)}
                             >
                               Sürətli görünüş
                             </button>
                           </div>
-    
-                          <Link to={`/products/${product.permalink}`} rel="noopener noreferrer">
+
+                          <Link to={`/product/${prod.permalink}`} rel="noopener noreferrer">
                             <div className="w-full h-[220px] flex items-center justify-center bg-[#ffffff] overflow-hidden relative">
                               <img
                                 src={
-                                  hoveredProductId === product.id && secondImage
+                                  hoveredProductId === prod.id && secondImage
                                     ? secondImage
-                                    : product.first_image?.original_url
+                                    : prod.first_image?.original_url
                                 }
-                                alt={product.title}
+                                alt={prod.title}
                                 className="w-[65%] h-fit object-contain transition-all duration-300"
                               />
                             </div>
                           </Link>
-    
+
                           <div className="flex flex-col flex-1 p-2">
                             <div className="flex flex-row items-center justify-start gap-3">
                               <div className="text-[18px] font-semibold text-gray-900">
@@ -734,11 +833,11 @@ const productSwiperRef = useRef(null);
                                 </div>
                               )}
                             </div>
-    
+
                             <h3 className="text-[14px] text-[#000000] hover:text-[#f50809] font-semibold leading-snug">
-                              {product.title || 'Məhsul adı'}
+                              {prod.title || 'Məhsul adı'}
                             </h3>
-    
+
                             <div className="flex flex-col items-start justify-start gap-3 mt-6">
                               <div className="flex items-center gap-2">
                                 <div className="flex space-x-1 text-[18px] cursor-default select-none">
@@ -750,14 +849,14 @@ const productSwiperRef = useRef(null);
                                 </div>
                                 <div className="flex items-center gap-1 text-gray-500 hover:text-[#000000]">
                                   <FaRegCommentDots className="text-[16px]" />
-                                  <span className="text-[14px]">{product.reviews_count_cached || 0}</span>
+                                  <span className="text-[14px]">{prod.reviews_count_cached || 0}</span>
                                 </div>
                               </div>
-    
+
                               {currentQuantity > 0 ? (
                                 <div className="flex items-center justify-between w-[140px] h-auto gap-2 rounded-md cursor-pointer">
                                   <button
-                                    onClick={() => handleQuantityChange(product, -1)}
+                                    onClick={() => handleQuantityChange(prod, -1)}
                                     className="text-[#ffffff] bg-[#f50809] px-1.5 py-2 rounded-l-md"
                                   >
                                     <FaMinus className="text-[20px] text-[#ffffff]" />
@@ -766,7 +865,7 @@ const productSwiperRef = useRef(null);
                                     {currentQuantity} <span>ədəd</span>
                                   </div>
                                   <button
-                                    onClick={() => handleQuantityChange(product, 1)}
+                                    onClick={() => handleQuantityChange(prod, 1)}
                                     className="text-[#ffffff] bg-[#f50809] px-1.5 py-2 rounded-r-md"
                                   >
                                     <FaPlus className="text-[20px] text-[#ffffff]" />
@@ -775,22 +874,22 @@ const productSwiperRef = useRef(null);
                               ) : (
                                 <div
                                   className={`flex flex-row items-center justify-center w-[140px] h-auto p-1.5 gap-2 rounded-md cursor-pointer ${
-                                    isOutOfStock ? 'bg-gray-400 cursor-not-allowed' : 'bg-[#f50809]'
+                                    isProdOutOfStock ? 'bg-gray-400 cursor-not-allowed' : 'bg-[#f50809]'
                                   }`}
-                                  onClick={() => !isOutOfStock && addToCart(product)}
+                                  onClick={() => !isProdOutOfStock && addToCart(prod)}
                                 >
                                   <BsCart3 className="text-[20px] text-[#ffffff] font-black" />
                                   <span className="text-[16px] text-[#ffffff] font-medium">
-                                    {isOutOfStock ? 'Stokda yoxdur' : 'Səbətə at'}
+                                    {isProdOutOfStock ? 'Stokda yoxdur' : 'Səbətə at'}
                                   </span>
                                 </div>
                               )}
                             </div>
-    
+
                             <div className="absolute top-0 left-0 flex flex-col items-start gap-1 mt-1">
-                              {hasDiscount && (
+                              {prodHasDiscount && (
                                 <span className="bg-[#f50809] text-[#ffffff] font-semibold px-2 py-0.5 rounded-sm text-[12px]">
-                                  -{discountPercent}%
+                                  -{prodDiscountPercent}%
                                 </span>
                               )}
                               {hasExpress && (
@@ -798,23 +897,23 @@ const productSwiperRef = useRef(null);
                                   Ekspress
                                 </span>
                               )}
-                              {product?.characteristics?.some((c) => c.title === 'TEZLİKLƏ!') && (
+                              {prod?.characteristics?.some((c) => c.title === 'TEZLİKLƏ!') && (
                                 <span className="bg-[#005bff] text-[#ffffff] font-semibold px-2 py-0.5 rounded-sm text-[12px]">
                                   Tezliklə!
                                 </span>
                               )}
                             </div>
-    
+
                             <div className="absolute top-0 right-0 flex flex-col items-start gap-1 mt-1">
-                              {isLiked ? (
+                              {likedLocal ? (
                                 <FaHeart
                                   className="text-[20px] text-[#f50809] cursor-pointer"
-                                  onClick={() => handleLikeToggle(product)}
+                                  onClick={() => handleLikeToggle(prod)}
                                 />
                               ) : (
                                 <FaRegHeart
                                   className="text-[20px] text-[#777777] hover:text-[#f50809] cursor-pointer"
-                                  onClick={() => handleLikeToggle(product)}
+                                  onClick={() => handleLikeToggle(prod)}
                                 />
                               )}
                             </div>
@@ -827,7 +926,7 @@ const productSwiperRef = useRef(null);
               ) : (
                 <p>Məhsul tapılmadı.</p>
               )}
-    
+
               <button
                 onClick={() => productSwiperRef.current?.slidePrev()}
                 className={`swiper-button-prev-custom absolute top-1/2 -left-5 -translate-y-1/2 z-20 p-2 bg-white rounded-full cursor-pointer transition-all duration-300 ${
@@ -848,6 +947,197 @@ const productSwiperRef = useRef(null);
           </div>
         </div>
       </div>
+
+      {/* Minimal modal (sürətli görünüş) */}
+      {isModalOpen && selectedProduct && (
+        <div className="fixed inset-0 bg-[#0a0a0a98] flex items-center justify-center z-50">
+          <div ref={modalRef} className="flex flex-col md:flex-row w-[95%] md:w-[982px] h-auto md:h-[530px] rounded-lg overflow-hidden bg-[#ffffff] relative p-4">
+            <button onClick={closeModal} className="absolute top-4 right-4 text-[#000000] z-50 cursor-pointer">
+              ✕
+            </button>
+
+            <div className="w-full md:w-1/2 h-fit p-2 md:p-4">
+              <div className="relative group w-full h-auto rounded-md">
+                <Swiper
+                  modules={[Navigation, Pagination]}
+                  spaceBetween={0}
+                  slidesPerView={1}
+                  loop={false}
+                  onSwiper={onSwiperInit}
+                  onSlideChange={onSlideChange}
+                  pagination={{
+                    el: '.custom-swiper-pagination',
+                    clickable: true,
+                  }}
+                  className="h-[400px] w-full"
+                >
+                  {(selectedProduct.images || [selectedProduct.first_image]).map((image) => (
+                    <SwiperSlide key={image?.id || image?.url}>
+                      <Link to={`/product/${selectedProduct.permalink}`} rel="noopener noreferrer">
+                        <img
+                          src={image?.original_url || image?.url}
+                          alt={selectedProduct.title}
+                          className="w-full h-full object-contain object-center rounded-md"
+                        />
+                      </Link>
+                    </SwiperSlide>
+                  ))}
+                </Swiper>
+                <button
+                  onClick={() => swiperRef.current?.slidePrev()}
+                  className={`absolute left-4 top-1/2 -translate-y-1/2 z-10 p-2 bg-white bg-opacity-70 rounded-full`}
+                  disabled={isFirstSlide}
+                >
+                  <GoArrowLeft className="text-2xl" />
+                </button>
+                <button
+                  onClick={() => swiperRef.current?.slideNext()}
+                  className={`absolute right-4 top-1/2 -translate-y-1/2 z-10 p-2 bg-white bg-opacity-70 rounded-full`}
+                  disabled={isLastSlide}
+                >
+                  <GoArrowRight className="text-2xl" />
+                </button>
+              </div>
+              <div className="custom-swiper-pagination mt-[15px] flex justify-center"></div>
+            </div>
+
+            <div className="flex flex-col flex-1 justify-start p-2 md:p-4">
+              <div className="flex flex-row items-center gap-2 mt-2 sm:mt-0">
+                {(selectedProduct.variants?.[0]?.old_price && selectedProduct.variants[0].old_price > selectedProduct.variants[0].price) && (
+                  <span className="bg-[#f50809] text-[#ffffff] font-semibold px-2 py-0.5 rounded-sm text-[12px]">
+                    -{Math.round(((selectedProduct.variants[0].old_price - selectedProduct.variants[0].price) / selectedProduct.variants[0].old_price) * 100)}%
+                  </span>
+                )}
+                {selectedProduct.characteristics?.some((c) => c.permalink === 'ekspress') && (
+                  <span className="bg-[#dcfe5c] text-[#000000] px-2 py-0.5 rounded-sm text-[12px] font-medium">
+                    Ekspress
+                  </span>
+                )}
+              </div>
+
+              <h2 className="text-[20px] font-semibold text-[#000000] mt-2">
+                {selectedProduct.title || 'Məhsul adı'}
+              </h2>
+
+              <div className="flex flex-row items-center justify-start gap-3 text-[12px] text-gray-400 mt-2">
+                {selectedProduct.variants?.[0]?.sku && (
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold">Artikul:</span>
+                    <span>{selectedProduct.variants[0].sku}</span>
+                  </div>
+                )}
+                {selectedProduct.unit && (
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold">Ölçü vahidi:</span>
+                    <span>{selectedProduct.unit === 'pce' ? 'ədəd' : selectedProduct.unit}</span>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex flex-row items-center gap-3 mt-2">
+                <div className="text-[22px] font-semibold text-gray-900">
+                  {selectedProduct.variants?.[0]?.price} AZN
+                </div>
+                {selectedProduct.variants?.[0]?.old_price &&
+                  selectedProduct.variants[0].old_price !== selectedProduct.variants[0].price && (
+                    <div className="text-[22px] line-through text-gray-500">
+                      {selectedProduct.variants[0].old_price} AZN
+                    </div>
+                  )}
+              </div>
+
+              <div className="flex items-center gap-1.5 mt-6">
+                <span
+                  className={`w-2 h-2 rounded-full ${
+                    selectedProduct.variants?.[0]?.quantity > 0 && selectedProduct.available
+                      ? 'bg-[#0fce2d]'
+                      : 'bg-[#f50809]'
+                  }`}
+                ></span>
+                <span className="text-[14px] text-[#000000] font-bold">
+                  {selectedProduct.variants?.[0]?.quantity > 0 && selectedProduct.available
+                    ? 'Mövcuddur'
+                    : 'Mövcud deyil'}
+                </span>
+              </div>
+
+              <div className="flex flex-col mt-4">
+                <div className="flex flex-row items-center justify-start gap-8">
+                  {cartQuantities[selectedProduct.id] > 0 ? (
+                    <div className="flex items-center justify-between w-full h-auto gap-2 rounded-md">
+                      <button
+                        onClick={() => handleModalQuantityChange(-1)}
+                        className="text-[#ffffff] bg-[#f50809] px-2 py-2 rounded-l-md"
+                      >
+                        <FaMinus className="text-[20px] text-[#ffffff]" />
+                      </button>
+                      <Link to="/cart">
+                        <div className="flex flex-col items-center text-[14px] text-[#000000] hover:text-[#f50809] font-medium p-2">
+                          <div className="flex flex-row items-center gap-1">
+                            <span>Səbətə at</span>
+                            <span>{cartQuantities[selectedProduct.id]}</span>
+                            <span>ədəd</span>
+                          </div>
+                          <span>Keçmək</span>
+                        </div>
+                      </Link>
+                      <button
+                        onClick={() => handleModalQuantityChange(1)}
+                        className="text-[#ffffff] bg-[#f50809] px-2 py-2 rounded-r-md"
+                      >
+                        <FaPlus className="text-[20px] text-[#ffffff]" />
+                      </button>
+                    </div>
+                  ) : (
+                    <div
+                      className={`flex items-center justify-center w-full h-auto p-2 gap-2 rounded-md cursor-pointer ${
+                        selectedProduct.variants?.[0]?.quantity === 0 || !selectedProduct.available
+                          ? 'bg-gray-400 cursor-not-allowed'
+                          : 'bg-[#f50809]'
+                      }`}
+                      onClick={() =>
+                        selectedProduct.variants?.[0]?.quantity > 0 &&
+                        selectedProduct.available &&
+                        addToCart(selectedProduct)
+                      }
+                    >
+                      <BsCart3 className="text-[20px] text-[#ffffff] font-black" />
+                      <span className="text-[16px] text-[#ffffff] font-medium">
+                        {selectedProduct.variants?.[0]?.quantity === 0 || !selectedProduct.available
+                          ? 'Mövcud deyil'
+                          : 'Səbətə at'}
+                      </span>
+                    </div>
+                  )}
+
+                  <div className="flex items-center justify-center">
+                    {likedProductIds[selectedProduct.id] ? (
+                      <FaHeart
+                        className="text-[24px] text-[#f50809] cursor-pointer"
+                        onClick={() => handleLikeToggle(selectedProduct)}
+                      />
+                    ) : (
+                      <FaRegHeart
+                        className="text-[24px] text-[#777777] hover:text-[#f50809] cursor-pointer"
+                        onClick={() => handleLikeToggle(selectedProduct)}
+                      />
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-center mt-4">
+                  <Link
+                    to={`/product/${selectedProduct.permalink}`}
+                    className="text-[14px] text-[#000000] hover:text-[#f50809] border-b border-dashed border-gray-400 hover:border-[#f50809]"
+                  >
+                    Məhsul səhifəsini açın
+                  </Link>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }
