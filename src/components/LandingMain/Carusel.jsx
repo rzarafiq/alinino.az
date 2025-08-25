@@ -13,6 +13,7 @@ import slide_4 from "../../assets/img/slide_4.jpg";
 import slide_5 from "../../assets/img/slide_5.jpg";
 import slide_6 from "../../assets/img/slide_6.jpg";
 import slide_7 from "../../assets/img/slide_7.jpg";
+import slide_8 from "../../assets/img/slide_8.jpg";
 
 const slides = [
   { id: 1, image: slide_1, href: "#", alt: "Slide 1" },
@@ -21,7 +22,8 @@ const slides = [
   { id: 4, image: slide_4, href: "#", alt: "Slide 4" },
   { id: 5, image: slide_5, href: "#", alt: "Slide 5" },
   { id: 6, image: slide_6, href: "#", alt: "Slide 6" },
-  { id: 7, image: slide_7, href: "#", alt: "Slide 7" }
+  { id: 7, image: slide_7, href: "#", alt: "Slide 7" },
+  { id: 8, image: slide_8, href: "#", alt: "Slide 8" }
 ];
 
 function Carusel() {
