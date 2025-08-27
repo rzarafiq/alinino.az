@@ -1,15 +1,14 @@
 import { Routes, Route } from "react-router-dom";
 import LandingLayout from "./layout/LandingLayout";
 import Landing from "./pages/Landing";
-import Cart from "./pages/Cart";
-import Favorites from "./pages/Favorites";
 import Product from "./pages/Product";
 import Collection from "./pages/Collection";
-import { FavoritesProvider } from "./contexts/FavoritesContext";
-import { CartProvider } from "./contexts/CartContext";
 import Search from "./pages/Search";
-import UserLayout from "./layout/UserLayout";
+import Cart from "./pages/Cart";
+import Favorites from "./pages/Favorites";
 import User from "./pages/User";
+import { CartProvider } from "./contexts/CartContext";
+import { FavoritesProvider } from "./contexts/FavoritesContext";
 
 function App() {
   return (
@@ -24,8 +23,6 @@ function App() {
             <Route path="cart" element={<Cart />} />
             <Route path="favorites" element={<Favorites />} />
             <Route path="search" element={<Search />} />
-          </Route>
-          <Route path="/" element={<UserLayout />}>
             <Route path="user" element={<User />} />
           </Route>
         </Routes>

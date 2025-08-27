@@ -2359,7 +2359,12 @@ const [isScrollable, setIsScrollable] = useState(false);
     0
   );
 
-  
+  const goToLogin = () => {
+    navigate('/user?tab=login');
+  };
+  const goToRegistration = () => {
+    navigate('/user?tab=registration');
+  };
 
   return (
     <>
@@ -2922,10 +2927,10 @@ const [isScrollable, setIsScrollable] = useState(false);
           </div>
           {/* Şəxsi kabinet */}
           <div className="relative group">
-            <div className="flex flex-col items-center justify-center text-[#000000] hover:text-[#f50809] cursor-pointer">
+            <button onClick={goToLogin} className="flex flex-col items-center justify-center text-[#000000] hover:text-[#f50809] cursor-pointer">
               <FaRegUser className="text-[20px]" />
               <span className="text-[12px]">Şəxsi kabinet</span>
-            </div>
+            </button>
             <div className="flex flex-col absolute top-12 right-0 bg-[#ffffff] w-[300px] h-auto p-[20px] gap-5 z-[100] shadow-xs rounded-md
                             opacity-0 translate-y-4 group-hover:opacity-100 group-hover:translate-y-0
                             pointer-events-none group-hover:pointer-events-auto
@@ -2934,19 +2939,19 @@ const [isScrollable, setIsScrollable] = useState(false);
                 <FaRegUser className="text-[50px] text-[#f5f5f5]" />
               </div>
               <div className="flex flex-row gap-3">
-                <Link to={'/Login'} className="flex items-center justify-center w-full h-[34px] px-[15px] text-[14px] text-[#ffffff] bg-[#f50809] rounded-md">
+                <button onClick={goToLogin} className="flex items-center justify-center w-full h-[34px] px-[15px] text-[14px] text-[#ffffff] bg-[#f50809] rounded-md cursor-pointer">
                 Avtorizasiya
-                </Link>
-                <Link to={'/Registration'} className="flex items-center justify-center w-full h-[34px] px-[15px] text-[14px] text-[#ffffff] bg-[#0052e6] hover:bg-[#007aff] rounded-md">
+                </button>
+                <button onClick={goToRegistration} className="flex items-center justify-center w-full h-[34px] px-[15px] text-[14px] text-[#ffffff] bg-[#0052e6] hover:bg-[#007aff] rounded-md cursor-pointer">
                   Qeydiyyat
-                </Link>
+                </button>
               </div>
             </div>
           </div>
           {/* Sevimlilər */}
           <div className="relative group">
             <Link
-              to="/Favorites"
+              to="/favorites"
               className="flex flex-col items-center justify-center text-[#000000] hover:text-[#f50809] cursor-pointer"
             >
               <FaRegHeart className="text-[20px]" />
@@ -3018,12 +3023,12 @@ const [isScrollable, setIsScrollable] = useState(false);
               {likedProducts.length > 0 && (
                 <div className="flex flex-col gap-4 px-6 pb-6">
                   <div className="bg-[#f7f8fa] px-6 py-2 rounded-md">
-                    <p className="text-[12px] text-[#000000] hover:text-[#dc0708] underline cursor-pointer">
+                    <Link to="/user" className="text-[12px] text-[#000000] hover:text-[#dc0708] underline cursor-pointer">
                       Sevdiyiniz məhsulları saxlamaq üçün şəxsi hesabınıza daxil olun
-                    </p>
+                    </Link>
                   </div>
                   <Link
-                    to="/Favorites"
+                    to="/favorites"
                     className="flex items-center justify-center bg-[#f50809] text-white text-[14px] py-2 rounded-md hover:bg-[#dc2626] 
                           transition cursor-pointer"
                   >
@@ -3036,7 +3041,7 @@ const [isScrollable, setIsScrollable] = useState(false);
           {/* Səbət */}
           <div className="relative group">
             <Link
-              to="/Cart"
+              to="/cart"
               className="flex flex-col items-center justify-center text-[#000000] hover:text-[#f50809] cursor-pointer"
             >
               <BsCart3 className="text-[20px]" />
@@ -3126,24 +3131,16 @@ const [isScrollable, setIsScrollable] = useState(false);
                     <div className="relative w-[260px]">
                       <input
                         type="text"
-                        // value={inputValue} // Assuming inputValue is defined elsewhere or removed
-                        // onChange={(e) => setInputValue(e.target.value)} // Assuming setInputValue is defined elsewhere or removed
                         placeholder="Kuponun kodunu qeyd edin"
                         className="border border-[#dddddd] px-4 py-1.5 rounded-md w-full outline-none placeholder:text-[14px]"
                       />
-                      {/* {inputValue && ( // Assuming inputValue is defined elsewhere or removed
-                        <RiCloseFill
-                          onClick={handleClear}
-                          className="absolute right-2 top-1/2 -translate-y-1/2 text-[18px] text-[#777777] hover:text-[#f50809] cursor-pointer"
-                        />
-                      )} */}
                     </div>
                     <p className="text-[14px] text-[#000000] hover:text-[#f50809] font-normal border-b border-dashed border-[#000000] hover:border-[#f50809] cursor-pointer">
                       Qəbul etmək
                     </p>
                   </div>
                   <Link
-                    to="/Favorites"
+                    to="/cart"
                     className="flex items-center justify-center bg-[#f50809] text-white text-[14px] py-2 rounded-md hover:bg-[#dc2626]  transition cursor-pointer">
                     <button>Səbəti aç</button>
                   </Link>

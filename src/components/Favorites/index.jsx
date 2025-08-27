@@ -266,7 +266,7 @@ function Favorites() {
               <RiInformation2Line className="text-[20px] sm:text-[22px] lg:text-[24px] text-[#777777] flex-shrink-0 mt-0.5" />
               <p className="text-[12px] sm:text-[13px] lg:text-[14px] text-[#888888]">
                 Diqqət edin! Sevimlilərinizə 20-dən çox məhsul əlavə edə bilməzsiniz. Seçimi saxlamaq üçün şəxsi hesabınıza{" "}
-                <span className="cursor-pointer underline">daxil olun</span>.
+                <Link to="/user" className="underline">daxil olun</Link>.
               </p>
             </div>
 
