@@ -238,7 +238,7 @@ function Favorites() {
       </div>
 
       {/* Məhsul siyahısı */}
-      <div className="flex flex-col gap-4 max-w-[1428px] mx-auto h-full px-4 sm:px-6 lg:px-[64px] overflow-y-auto">
+      <div className="flex flex-col gap-4 max-w-[1428px] mx-auto h-full px-4 sm:px-6 mb-5 lg:px-[64px] overflow-y-auto">
         {likedProducts.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20">
             <FaRegHeart className="text-[80px] sm:text-[100px] lg:text-[120px] text-[#f5f5f5]" />

@@ -1,13 +1,13 @@
 import { useState, useEffect } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { FaRegEye, FaRegEyeSlash } from "react-icons/fa6";
 
 function User() {
   const [showPassword, setShowPassword] = useState(false);
   const [showRecovery, setShowRecovery] = useState(false);
   const [showRegistration, setShowRegistration] = useState(false);
-  
   const location = useLocation();
+  const navigate = useNavigate();
 
   // URL-dən tab parametrini yoxlayıb və uyğun formanı açır
   useEffect(() => {
@@ -17,6 +17,9 @@ function User() {
     if (tab === 'registration') {
       setShowRegistration(true);
       setShowRecovery(false);
+    } else if (tab === 'recovery') {
+      setShowRecovery(true);
+      setShowRegistration(false);
     } else if (tab === 'login') {
       setShowRegistration(false);
       setShowRecovery(false);
@@ -26,19 +29,19 @@ function User() {
   const showRecoveryForm = () => {
     setShowRecovery(true);
     setShowRegistration(false);
-    window.history.replaceState(null, '', '/user?tab=recovery');
+    navigate('/user?tab=recovery', { replace: true });
   };
   
   const showLoginForm = () => {
     setShowRecovery(false);
     setShowRegistration(false);
-    window.history.replaceState(null, '', '/user?tab=login');
+    navigate('/user?tab=login', { replace: true });
   };
   
   const showRegistrationForm = () => {
     setShowRegistration(true);
     setShowRecovery(false);
-    window.history.replaceState(null, '', '/user?tab=registration');
+    navigate('/user?tab=registration', { replace: true });
   };
 
   return (

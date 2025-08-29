@@ -736,7 +736,7 @@ function LandigMain() {
           </p>
         </div>
       </section>
-      <section className="flex flex-col group w-full max-w-[1428px] mx-auto mt-10 px-4 sm:px-6 md:px-10 lg:px-[64px] h-auto">
+      <section className="flex flex-col w-full max-w-[1428px] mx-auto mt-10 px-4 sm:px-6 md:px-10 lg:px-[64px] h-auto">
         {/* Başlıq */}
         <div className="flex items-center justify-center">
           <h2 className="text-lg sm:text-xl md:text-2xl lg:text-[30px] text-[#000000] hover:text-[#f50809] font-medium transition-colors duration-200">
@@ -746,65 +746,66 @@ function LandigMain() {
 
         {/* Şəkillər */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 mt-5">
+          {/* Hər bir Link öz 'group' sinifinə malikdir */}
           <Link to="https://www.instagram.com/ali_and_nino/" className="relative group overflow-hidden w-full h-auto">
-            <img
-              src={lev_tolostoy}
-              alt="lev_tolostoy"
-              className="w-full h-auto object-cover transform transition duration-500 group-hover:scale-110 group-hover:brightness-75"
-            />
-            <div className="absolute inset-0 flex items-center justify-center opacity-0 transition duration-300 group-hover:opacity-100">
-              <FaInstagram className="text-white text-[70px] transform scale-50 transition duration-300 group-hover:scale-100" />
-            </div>
+              <img
+                  src={lev_tolostoy}
+                  alt="lev_tolostoy"
+                  className="w-full h-auto object-cover transform transition duration-500 group-hover:scale-110 group-hover:brightness-75"
+              />
+              <div className="absolute inset-0 flex items-center justify-center opacity-0 transition duration-300 group-hover:opacity-100">
+                  <FaInstagram className="text-white text-[70px] transform scale-50 transition duration-300 group-hover:scale-100" />
+              </div>
           </Link>
           <Link to="https://www.instagram.com/ali_and_nino/" className="relative group overflow-hidden w-full h-auto">
-            <img
-              src={milli_musiqi}
-              alt="milli_musiqi"
-              className="w-full h-auto object-cover transform transition duration-500 group-hover:scale-110 group-hover:brightness-75"
-            />
-            <div className="absolute inset-0 flex items-center justify-center opacity-0 transition duration-300 group-hover:opacity-100">
-              <FaInstagram className="text-white text-[70px] transform scale-50 transition duration-300 group-hover:scale-100" />
-            </div>
+              <img
+                  src={milli_musiqi}
+                  alt="milli_musiqi"
+                  className="w-full h-auto object-cover transform transition duration-500 group-hover:scale-110 group-hover:brightness-75"
+              />
+              <div className="absolute inset-0 flex items-center justify-center opacity-0 transition duration-300 group-hover:opacity-100">
+                  <FaInstagram className="text-white text-[70px] transform scale-50 transition duration-300 group-hover:scale-100" />
+              </div>
           </Link>
           <Link to="https://www.instagram.com/ali_and_nino/" className="relative group overflow-hidden w-full h-auto">
-            <img
-              src={huseyn_cavid}
-              alt="huseyn_cavid"
-              className="w-full h-auto object-cover transform transition duration-500 group-hover:scale-110 group-hover:brightness-75"
-            />
-            <div className="absolute inset-0 flex items-center justify-center opacity-0 transition duration-300 group-hover:opacity-100">
-              <FaInstagram className="text-white text-[70px] transform scale-50 transition duration-300 group-hover:scale-100" />
-            </div>
+              <img
+                  src={huseyn_cavid}
+                  alt="huseyn_cavid"
+                  className="w-full h-auto object-cover transform transition duration-500 group-hover:scale-110 group-hover:brightness-75"
+              />
+              <div className="absolute inset-0 flex items-center justify-center opacity-0 transition duration-300 group-hover:opacity-100">
+                  <FaInstagram className="text-white text-[70px] transform scale-50 transition duration-300 group-hover:scale-100" />
+              </div>
           </Link>
           <Link to="https://www.instagram.com/ali_and_nino/" className="relative group overflow-hidden w-full h-auto">
-            <img
-              src={mark_levi}
-              alt="mark_levi"
-              className="w-full h-auto object-cover transform transition duration-500 group-hover:scale-110 group-hover:brightness-75"
-            />
-            <div className="absolute inset-0 flex items-center justify-center opacity-0 transition duration-300 group-hover:opacity-100">
-              <FaInstagram className="text-white text-[70px] transform scale-50 transition duration-300 group-hover:scale-100" />
-            </div>
+              <img
+                  src={mark_levi}
+                  alt="mark_levi"
+                  className="w-full h-auto object-cover transform transition duration-500 group-hover:scale-110 group-hover:brightness-75"
+              />
+              <div className="absolute inset-0 flex items-center justify-center opacity-0 transition duration-300 group-hover:opacity-100">
+                  <FaInstagram className="text-white text-[70px] transform scale-50 transition duration-300 group-hover:scale-100" />
+              </div>
           </Link>
           <Link to="https://www.instagram.com/ali_and_nino/" className="relative group overflow-hidden w-full h-auto">
-            <img
-              src={fridrix_nitsse}
-              alt="fridrix_nitsse"
-              className="w-full h-auto object-cover transform transition duration-500 group-hover:scale-110 group-hover:brightness-75"
-            />
-            <div className="absolute inset-0 flex items-center justify-center opacity-0 transition duration-300 group-hover:opacity-100">
-              <FaInstagram className="text-white text-[70px] transform scale-50 transition duration-300 group-hover:scale-100" />
-            </div>
+              <img
+                  src={fridrix_nitsse}
+                  alt="fridrix_nitsse"
+                  className="w-full h-auto object-cover transform transition duration-500 group-hover:scale-110 group-hover:brightness-75"
+              />
+              <div className="absolute inset-0 flex items-center justify-center opacity-0 transition duration-300 group-hover:opacity-100">
+                  <FaInstagram className="text-white text-[70px] transform scale-50 transition duration-300 group-hover:scale-100" />
+              </div>
           </Link>
           <Link to="https://www.instagram.com/ali_and_nino/" className="relative group overflow-hidden w-full h-auto">
-            <img
-              src={parisde_gun}
-              alt="parisde_gun"
-              className="w-full h-auto object-cover transform transition duration-500 group-hover:scale-110 group-hover:brightness-75"
-            />
-            <div className="absolute inset-0 flex items-center justify-center opacity-0 transition duration-300 group-hover:opacity-100">
-              <FaInstagram className="text-white text-[70px] transform scale-50 transition duration-300 group-hover:scale-100" />
-            </div>
+              <img
+                  src={parisde_gun}
+                  alt="parisde_gun"
+                  className="w-full h-auto object-cover transform transition duration-500 group-hover:scale-110 group-hover:brightness-75"
+              />
+              <div className="absolute inset-0 flex items-center justify-center opacity-0 transition duration-300 group-hover:opacity-100">
+                  <FaInstagram className="text-white text-[70px] transform scale-50 transition duration-300 group-hover:scale-100" />
+              </div>
           </Link>
         </div>
       </section>

@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef, useMemo } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { FiTrash2 } from "react-icons/fi";
-import { FaRegStar, FaRegCommentDots, FaRegHeart, FaHeart, FaMinus, FaPlus, FaWhatsapp, FaChevronUp, FaCheck } from "react-icons/fa";
+import { FaRegStar, FaRegCommentDots, FaRegHeart, FaHeart, FaMinus, FaPlus, FaWhatsapp, FaChevronUp, FaChevronDown, FaCheck, FaRegEye, FaRegEyeSlash } from "react-icons/fa";
 import { FaArrowLeftLong, FaArrowRightLong } from "react-icons/fa6";
 import { RiCloseFill } from "react-icons/ri";
 import { BsCart3 } from "react-icons/bs";
@@ -371,7 +371,9 @@ function Cart() {
   const [checked, setChecked] = useState(false);
   const [selectedOption, setSelectedOption] = useState("option1");
   const [paymentOption, setPaymentOption] = useState("option1"); 
-
+  const [isCartOpen, setIsCartOpen] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [isLoginOpen, setIsLoginOpen] = useState(false);
 
   // Responsive
   useEffect(() => {
@@ -808,8 +810,24 @@ function Cart() {
   };
 
   const totalPrice = parseFloat(totalAmount) + parseFloat(getDeliveryPrice());
+  
+  const toggleContent = () => {
+      setIsCartOpen(!isCartOpen);
+  };
 
+  const scrollRef = useRef(null);
 
+  const showRecoveryForm = () => {
+    setIsLoginOpen(false);
+  };
+
+  const showRegistrationForm = () => {
+    setIsLoginOpen(false);
+  };
+
+  const closeLoginModal = () => {
+  setIsLoginOpen(false);
+};
     
   return (
     <>
@@ -862,9 +880,9 @@ function Cart() {
         )}
       </div>
 
-
       {/* Səbət və Sifariş Formu */}
       <div className="flex flex-col gap-4 max-w-[1428px] mx-auto h-full px-2 md:px-10 lg:px-[64px] overflow-y-auto">
+        
         {/* Səbət siyahısı (yalnız showOrderForm DEYİLSƏ görünür) */}
         {!showOrderForm && cartProducts.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20">
@@ -1003,71 +1021,158 @@ function Cart() {
 
         {/* Sifarişin Hazırlanması Formu (yalnız showOrderForm TRUE-dursa görünür) */}
         {showOrderForm && (
-          <div className="flex flex-row items-start justify-between gap-10 my-5">
-            <div className="flex flex-col w-1/2">
-              <div className="flex flex-col gap-1">
-                <span className="text-[14px] md:text-[16px] text-[#999999]">Məsələn: +994 111-11-11</span>
-                <button className="w-full py-3 mb-3 md:mb-5 text-[14px] md:text-[16px] text-[#ffffff] bg-[#dc0708] hover:bg-[#1a6bff] rounded-md cursor-pointer transition-colors duration-300">
+          <div className="flex flex-col md:flex-row items-start justify-between gap-8 my-5">
+            {/* Səbət (mobil: yuxarı, desktop: sağ) */}
+            <div className="flex flex-col w-full md:w-1/2 order-1 md:order-2">
+              {/* Mobil görünüş üçün Yığcam görünüş */}
+              <div
+                  className={`flex justify-between items-center md:hidden cursor-pointer bg-[#eeeeee] p-4 ${isCartOpen ? 'rounded-t-md' : 'rounded-md'}`}
+                  onClick={toggleContent}
+              >
+                  <div className="flex items-center gap-2">
+                      <span className="text-[16px] text-[#000000] font-normal">Sizin sifarişiniz</span>
+                      <FaChevronDown className="text-sm" />
+                  </div>
+                  <span className="text-[16px] text-[#000000] font-semibold">{totalPrice} AZN</span>
+              </div>
+
+              {/* Açıq vəziyyətdə görünən məzmun */}
+              <div className={`flex-col gap-4 w-full border-b border-r border-l border-[#dddddd] rounded-b-md p-4 ${isCartOpen ? 'flex' : 'hidden'} md:flex md:w-full md:border md:rounded-md`}>
+                {cartProducts.map((product) => {
+                    const quantity = product.quantity || 1;
+                    const unitPrice = product.variants?.[0]?.price || 0;
+                    return (
+                        <div key={product.id} className="flex items-center gap-3 w-full">
+                            <Link to={`/products/${product.permalink}`}>
+                                <img
+                                    src={product.first_image?.medium_url}
+                                    alt={product.title}
+                                    className="w-10 h-16 object-cover rounded"
+                                />
+                            </Link>
+                            <div className="flex flex-col flex-1">
+                                <Link
+                                    to={`/products/${product.permalink}`}
+                                    className="text-[14px] md:text-[16px] text-[#000000] hover:text-[#f50809] transition-colors duration-300 font-normal line-clamp-2"
+                                >
+                                    {product.title}
+                                </Link>
+                            </div>
+                            <span className="text-[14px] md:text-[16px] text-[#000000] font-semibold whitespace-nowrap">
+                                {quantity} × {unitPrice} AZN
+                            </span>
+                        </div>
+                    );
+                })}
+
+                {cartProducts.length > 0 && (
+                    <>
+                        <div className="flex flex-col gap-3 bg-[#ffffff] border-y border-[#dddddd] py-4 mt-3">
+                            <p className="text-[14px] md:text-[16px] text-[#000000] font-normal">
+                                Promokod və ya endirim kuponu (Hər sifarişdə yalnız bir promokod istifadə etmək mümkündür)
+                            </p>
+                            <div className="flex flex-row items-center gap-2 w-full">
+                              <div className="relative flex-1">
+                                  <input
+                                      type="text"
+                                      placeholder="Kuponun kodunu qeyd edin"
+                                      className="border border-[#dddddd] px-4 py-2.5 rounded-md w-full outline-none text-[14px]"
+                                  />
+                              </div>
+                              <p className="text-[12px] md:text-[14px] text-[#000000] hover:text-[#f50809] font-normal border-b border-dashed border-[#000000] hover:border-[#f50809] cursor-pointer flex-shrink-0">
+                                  Qəbul etmək
+                              </p>
+                            </div>
+                            <div className="flex flex-col mt-2">
+                                <div className="flex justify-between text-[14px] md:text-[16px] text-[#000000]">
+                                    <span>Məhsullar üzrə məbləğ</span>
+                                    <span className="font-medium">{totalAmount} AZN</span>
+                                </div>
+                                <div className="flex justify-between text-[14px] md:text-[16px] text-[#000000] mt-1">
+                                    <span>Çatdırılma xərcləri</span>
+                                    <span className="font-medium">{getDeliveryPrice()}</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div className="flex justify-between items-center">
+                            <p className="text-[16px] md:text-[20px] text-[#000000] font-normal">NƏTİCƏ:</p>
+                            <span className="text-[16px] md:text-[20px] text-[#000000] font-semibold">{totalPrice} AZN</span>
+                        </div>
+                    </>
+                )}
+              </div>
+            </div>
+
+            {/* Sifariş formu (mobil: aşağı, desktop: sol) */}
+            <div className="flex flex-col w-full md:w-1/2 order-2 md:order-1">
+              {/* Giriş düyməsi */}
+              <div className="flex flex-col gap-1 mb-4">
+                <span className="text-[14px] text-[#999999]">Məsələn: +994 111-11-11</span>
+                <button onClick={() => setIsLoginOpen(true)} className="w-full lg:w-[410px] py-3 text-[16px] md:text-[18px] text-[#ffffff] bg-[#dc0708] hover:bg-[#1a6bff] rounded-md transition-colors duration-300">
                   Qeydiyyatdan keçmiş alıcılar üçün daxil olun
                 </button>
               </div>
-              <div className="flex flex-col gap-4 mb-10">
-                <h4 className="flex flex-row gap-1 text-[14px] md:text-[22px] text-[#000000] font-medium mt-1">Çatdırılma xidməti təfərrüatları:</h4>
-                <label htmlFor="fullname" className="flex flex-col w-full ">
-                  <p className="flex flex-row gap-1 text-[14px] md:text-[16px] text-[#000000] mb-1">Şəxsi əlaqə (Adı, soyadı, atasının adı)
-                    <span className="text-[#f50809]">*</span>
+
+              {/* Çatdırılma təfərrüatları */}
+              <div className="flex flex-col gap-4 mb-6">
+                <h4 className="text-[16px] md:text-[22px] text-[#000000] font-medium">Çatdırılma xidməti təfərrüatları:</h4>
+                <label htmlFor="fullname" className="flex flex-col w-full">
+                  <p className="text-[14px] md:text-[16px] text-[#000000] mb-1">
+                    Şəxsi əlaqə (Adı, soyadı, atasının adı) <span className="text-[#f50809]">*</span>
                   </p>
                   <input
                     type="text"
                     id="fullname"
-                    className="w-full p-2 border border-[#dddddd] rounded-md outline-none"
+                    className="w-full p-2 border border-[#dddddd] rounded-md outline-none text-[14px]"
                   />
                 </label>
                 <label htmlFor="reg-email" className="flex flex-col w-full">
-                  <p className="flex flex-row gap-1 text-[14px] md:text-[16px] text-[#000000] mb-1">Elektron ünvan
-                    <span className="text-[#f50809]">*</span>
+                  <p className="text-[14px] md:text-[16px] text-[#000000] mb-1">
+                    Elektron ünvan <span className="text-[#f50809]">*</span>
                   </p>
                   <input
                     type="email"
                     id="reg-email"
-                    className="w-full p-2 border border-[#dddddd] rounded-md outline-none"
+                    className="w-full p-2 border border-[#dddddd] rounded-md outline-none text-[14px]"
                   />
                 </label>
                 <label htmlFor="phone" className="flex flex-col w-full">
-                  <p className="text-[14px] md:text-[16px] text-[#000000] mb-1">Əlaqə nömrəsi (sifarişin detallarını dəqiqləşdirmək üçün)
-                    <span className="text-[#f50809]">*</span>
+                  <p className="text-[14px] md:text-[16px] text-[#000000] mb-1">
+                    Əlaqə nömrəsi (sifarişin detallarını dəqiqləşdirmək üçün) <span className="text-[#f50809]">*</span>
                   </p>
                   <input
                     type="tel"
                     id="phone"
-                    className="w-full p-2 border border-[#dddddd] rounded-md outline-none"
+                    className="w-full p-2 border border-[#dddddd] rounded-md outline-none text-[14px]"
                   />
                 </label>
               </div>
-              <div className="flex flex-col gap-5">
-                <h4 className="flex flex-row gap-1 text-[14px] md:text-[22px] text-[#000000] font-medium mt-1">Çatdırılma</h4>
+
+              {/* Çatdırılma */}
+              <div className="flex flex-col gap-5 mb-6">
+                <h4 className="text-[16px] md:text-[22px] text-[#000000] font-medium">Çatdırılma</h4>
                 <label htmlFor="country" className="flex flex-col w-full">
-                  <p className="flex flex-row gap-1 text-[14px] md:text-[16px] text-[#000000] mb-1">Ölkə
-                    <span className="text-[#f50809]">*</span>
+                  <p className="text-[14px] md:text-[16px] text-[#000000] mb-1">
+                      Ölkə <span className="text-[#f50809]">*</span>
                   </p>
                   <select
-                    id="country"
-                    name="shipping_address[country]"
-                    value={selectedCountry}
-                    onChange={(e) => setSelectedCountry(e.target.value)}
-                    className="border border-[#dddddd] rounded-md p-3 text-[14px] md:text-[16px] outline-none"
+                      id="country"
+                      name="shipping_address[country]"
+                      value={selectedCountry}
+                      onChange={(e) => setSelectedCountry(e.target.value)}
+                      ref={scrollRef}
+                      className="w-full p-3 border border-[#dddddd] rounded-md outline-none text-[12px] md:text-[16px] overflow-y-auto custom-scrollbar"
                   >
-                    {countrys.map((country) => (
-                      <option key={country.code} value={country.code}>
-                        {country.name}
-                      </option>
-                    ))}
+                      {countrys.map((country) => (
+                          <option key={country.code} value={country.code}>
+                              {country.name}
+                          </option>
+                      ))}
                   </select>
-                </label>
+                </label>           
                 <label htmlFor="city" className="flex flex-col w-full">
-                  <p className="flex flex-row gap-1 text-[14px] md:text-[16px] text-[#000000] mb-1">
-                    Şəhər
-                    <span className="text-[#f50809]">*</span>
+                  <p className="text-[14px] md:text-[16px] text-[#000000] mb-1">
+                    Şəhər <span className="text-[#f50809]">*</span>
                   </p>
                   {selectedCountry === 'AZ' ? (
                     <select
@@ -1075,7 +1180,7 @@ function Cart() {
                       name="shipping_address[city]"
                       value={selectedCity}
                       onChange={(e) => setSelectedCity(e.target.value)}
-                      className="border border-[#dddddd] rounded-md p-3 text-[14px] md:text-[16px] outline-none"
+                      className="w-full p-3 border border-[#dddddd] rounded-md outline-none text-[12px] md:text-[16px] overflow-y-auto custom-scrollbar"
                     >
                       {citys.map((city) => (
                         <option key={city.code} value={city.code}>
@@ -1091,321 +1196,190 @@ function Cart() {
                       value={selectedCity}
                       onChange={(e) => setSelectedCity(e.target.value)}
                       placeholder="Şəhəri yazın"
-                      className="border border-[#dddddd] rounded-md p-2 text-[14px] md:text-[16px] outline-none"
+                      className="w-full p-3 border border-[#dddddd] rounded-md outline-none text-[12px] md:text-[16px] overflow-y-auto"
                     />
                   )}
                 </label>
                 <label htmlFor="address" className="flex flex-col w-full">
-                  <span className="text-[14px] md:text-[16px] text-[#000000] mb-1">
-                    Ünvan
-                  </span>
+                  <span className="text-[14px] md:text-[16px] text-[#000000] mb-1">Ünvan</span>
                   <textarea
                     id="address"
                     name="address"
                     placeholder="Küçə, ev, mərtəbə"
-                    className="w-full h-[70px] p-2 border border-[#dddddd] rounded-md outline-none resize-none"
+                    className="w-full h-16 p-2 border border-[#dddddd] rounded-md outline-none resize-none text-[14px]"
                   ></textarea>
                 </label>
-                <h4 className="flex flex-row gap-1 text-[14px] md:text-[22px] text-[#000000] font-medium mt-1">Alıcı</h4>
-                <label htmlFor="recipient-phone" className="flex flex-col w-full mb-3 md:mb-5">
+              </div>
+
+              {/* Alıcı */}
+              <div className="flex flex-col gap-5 mb-6">
+                <h4 className="text-[16px] md:text-[22px] text-[#000000] font-medium">Alıcı</h4>
+                <label htmlFor="recipient-phone" className="flex flex-col w-full mb-3">
                   <p className="text-[14px] md:text-[16px] text-[#000000] mb-1">Sifarişi alan şəxsin nömrəsi</p>
                   <input
                     type="tel"
                     id="recipient-phone"
-                    className="w-full p-3 border border-[#dddddd] rounded-md outline-none"
+                    className="w-full p-3 border border-[#dddddd] rounded-md outline-none text-[14px]"
                   />
-                  <span className="text-[14px] md:text-[16px] text-[#999999] mt-1">Lütfən, sifarişi təhvil alacaq şəxsin nömrəsini qeyd edin</span>
+                  <span className="text-[14px] text-[#999999] mt-1">
+                    Lütfən, sifarişi təhvil alacaq şəxsin nömrəsini qeyd edin
+                  </span>
                 </label>
-                <label className="flex flex-row gap-2 w-full mb-3 md:mb-5 items-start cursor-pointer select-none">
-                  <div onClick={() => setChecked(!checked)} className="relative w-4 h-4 md:w-5 md:h-5 border-2 border-[#000000] flex items-center justify-center overflow-hidden">
-                    {/* 4 tərəfdən mərkəzə doğru dolma effekti */}
-                    <div className="absolute inset-0">
-                      <div className={`absolute top-0 left-0 h-full w-0 bg-[#000000] transition-all duration-300 ease-in-out ${
-                          checked ? "w-1/2" : ""
-                        }`}
-                      ></div>
-                      <div className={`absolute top-0 right-0 h-full w-0 bg-[#000000] transition-all duration-300 ease-in-out ${
-                          checked ? "w-1/2" : ""
-                        }`}
-                      ></div>
-                      <div className={`absolute top-0 left-0 w-full h-0 bg-[#000000] transition-all duration-300 ease-in-out ${
-                          checked ? "h-1/2" : ""
-                        }`}
-                      ></div>
-                      <div className={`absolute bottom-0 left-0 w-full h-0 bg-[#000000] transition-all duration-300 ease-in-out ${
-                          checked ? "h-1/2" : ""
-                        }`}
-                      ></div>
-                    </div>
-
-                    {checked && <FaCheck className="relative text-[#ffffff] text-[8px] md:text-[10px] z-10" />}
-                  </div>
-
-                  <div className="flex flex-col">
-                    <p className="text-[14px] md:text-[16px] text-[#000000] mb-1">
-                      Qeydiyyatdan keçmək istərdiniz?
-                    </p>
-                    <span className="text-[14px] md:text-[16px] text-[#999999] mt-1">
-                      Siz sifariş tarixçəsini görə biləcək, yeniliklər və endirimlər haqqında asanlıqla məlumat ala biləcəksiniz.
-                    </span>
-                  </div>
-                </label>
-                <div className="flex flex-col">
-                  <label className="flex flex-row items-start justify-between w-full mb-3 md:mb-5 cursor-pointer select-none">
-                    <div className="flex flex-row gap-2 ">
-                      <div 
-                        onClick={() => setSelectedOption('option1')} 
-                        className="relative w-4 h-4 md:w-5 md:h-5 border-2 border-[#000000] flex items-center justify-center rounded-full overflow-hidden"
+  
+                <div className="flex flex-col w-full items-start cursor-pointer select-none">
+                  <div className="flex gap-2">
+                      <div
+                          onClick={() => setChecked(!checked)}
+                          className="relative w-4 h-4 md:w-5 md:h-5 border-2 border-[#000000] flex items-center justify-center overflow-hidden flex-shrink-0 mt-1"
                       >
-                        {/* 4 tərəfdən mərkəzə doğru dolma effekti */}
-                        <div className="absolute inset-0">
-                          <div className={`absolute top-0 left-0 h-full w-0 bg-[#000000] transition-all duration-300 ease-in-out ${
-                              selectedOption === 'option1' ? "w-1/2" : ""
-                            }`}
-                          ></div>
-                          <div className={`absolute top-0 right-0 h-full w-0 bg-[#000000] transition-all duration-300 ease-in-out ${
-                              selectedOption === 'option1' ? "w-1/2" : ""
-                            }`}
-                          ></div>
-                          <div className={`absolute top-0 left-0 w-full h-0 bg-[#000000] transition-all duration-300 ease-in-out ${
-                              selectedOption === 'option1' ? "h-1/2" : ""
-                            }`}
-                          ></div>
-                          <div className={`absolute bottom-0 left-0 w-full h-0 bg-[#000000] transition-all duration-300 ease-in-out ${
-                              selectedOption === 'option1' ? "h-1/2" : ""
-                            }`}
-                          ></div>
-                        </div>
-
-                        {selectedOption === 'option1' && <GoDotFill className="relative text-[#ffffff] text-[16px] md:text-[20px] z-10" />}
-                      </div>
-                      <div className="flex flex-col">
-                        <p className="text-[14px] md:text-[16px] text-[#000000] mb-1">
-                          Çatdırılma kuryer (free)
-                        </p>
-                        <span className="text-[14px] md:text-[16px] text-[#999999] mt-1">
-                          Bakı şəhəri üzrə 24 saat ərzində çatdırılma. 
-                        </span>
-                      </div>
-                    </div>
-                    <div>
-                      <p className="text-[14px] md:text-[18px] text-[#000000] font-bold">+ 5 AZN</p>
-                    </div>
-                  </label>
-
-                  <label className="flex flex-row items-start justify-between w-full mb-3 md:mb-5 cursor-pointer select-none">
-                    <div className="flex flex-row gap-2 ">
-                      <div 
-                        onClick={() => setSelectedOption('option2')} 
-                        className="relative w-4 h-4 md:w-5 md:h-5 border-2 border-[#000000] flex items-center justify-center rounded-full overflow-hidden"
-                      >
-                        {/* 4 tərəfdən mərkəzə doğru dolma effekti */}
-                        <div className="absolute inset-0">
-                          <div className={`absolute top-0 left-0 h-full w-0 bg-[#000000] transition-all duration-300 ease-in-out ${
-                              selectedOption === 'option2' ? "w-1/2" : ""
-                            }`}
-                          ></div>
-                          <div className={`absolute top-0 right-0 h-full w-0 bg-[#000000] transition-all duration-300 ease-in-out ${
-                              selectedOption === 'option2' ? "w-1/2" : ""
-                            }`}
-                          ></div>
-                          <div className={`absolute top-0 left-0 w-full h-0 bg-[#000000] transition-all duration-300 ease-in-out ${
-                              selectedOption === 'option2' ? "h-1/2" : ""
-                            }`}
-                          ></div>
-                          <div className={`absolute bottom-0 left-0 w-full h-0 bg-[#000000] transition-all duration-300 ease-in-out ${
-                              selectedOption === 'option2' ? "h-1/2" : ""
-                            }`}
-                          ></div>
-                        </div>
-
-                        {selectedOption === 'option2' && <GoDotFill className="relative text-[#ffffff] text-[16px] md:text-[20px] z-10" />}
-                      </div>
-                      <div className="flex flex-col">
-                        <p className="text-[14px] md:text-[16px] text-[#000000] mb-1">
-                          Ekspress çatdırılma
-                        </p>
-                        <span className="text-[14px] md:text-[16px] text-[#999999] mt-1">
-                          1 saat ərzində çatdırılma (Hava şəraiti ilə əlaqədar sifarişlərdə gecikmələr ola bilər)
-                        </span>
-                        <span className="text-[14px] md:text-[16px] text-[#999999] mt-1">
-                          20:00-dan sonra edilən Bakı üzrə şəhərdaxili sifarişlərin çatdırılması növbəti gün 9:00 - 10:00-dək baş tutacaq.
-                        </span>
-                      </div>
-                    </div>
-                    <div>
-                      <p className="text-[14px] md:text-[18px] text-[#000000] font-bold">+ 7 AZN</p>
-                    </div>
-                  </label>
-
-                  <label className="flex flex-row items-start justify-between w-full mb-3 md:mb-5 cursor-pointer select-none">
-                    <div className="flex flex-row gap-2 ">
-                      <div 
-                        onClick={() => setSelectedOption('option3')} 
-                        className="relative w-4 h-4 md:w-5 md:h-5 border-2 border-[#000000] flex items-center justify-center rounded-full overflow-hidden"
-                      >
-                        {/* 4 tərəfdən mərkəzə doğru dolma effekti */}
-                        <div className="absolute inset-0">
-                          <div className={`absolute top-0 left-0 h-full w-0 bg-[#000000] transition-all duration-300 ease-in-out ${
-                              selectedOption === 'option3' ? "w-1/2" : ""
-                            }`}
-                          ></div>
-                          <div className={`absolute top-0 right-0 h-full w-0 bg-[#000000] transition-all duration-300 ease-in-out ${
-                              selectedOption === 'option3' ? "w-1/2" : ""
-                            }`}
-                          ></div>
-                          <div className={`absolute top-0 left-0 w-full h-0 bg-[#000000] transition-all duration-300 ease-in-out ${
-                              selectedOption === 'option3' ? "h-1/2" : ""
-                            }`}
-                          ></div>
-                          <div className={`absolute bottom-0 left-0 w-full h-0 bg-[#000000] transition-all duration-300 ease-in-out ${
-                              selectedOption === 'option3' ? "h-1/2" : ""
-                            }`}
-                          ></div>
-                        </div>
-
-                        {selectedOption === 'option3' && <GoDotFill className="relative text-[#ffffff] text-[16px] md:text-[20px] z-10" />}
-                      </div>
-                      <div className="flex flex-col">
-                        <p className="text-[14px] md:text-[16px] text-[#000000] mb-1">
-                          Azərbaycanın bölgələrinə ekspress çatdırılma
-                        </p>
-                        <span className="text-[14px] md:text-[16px] text-[#999999] mt-1">
-                          Sifariş edildikdən sonra cəmi 7 saat ərzində çatdırılır.
-                        </span>
-                        <span className="text-[14px] md:text-[16px] text-[#999999] mt-1">
-                          Naxçıvan MR və Şahdağ ərazilərinə ekspress çatdırılma qiyməti fərqli ola bilər.
-                        </span>
-                        <span className="text-[14px] md:text-[16px] text-[#999999] mt-1">
-                          Naxçıvan MR ekspress poçtla göndəriləcək.
-                        </span>
-                      </div>
-                    </div>
-                    <div>
-                      <p className="text-[14px] md:text-[18px] text-[#000000] font-bold">+ 10 AZN</p>
-                    </div>
-                  </label>
-
-                  <label className="flex flex-row items-start justify-between w-full mb-3 md:mb-5 cursor-pointer select-none">
-                    <div className="flex flex-row gap-2 ">
-                      <div 
-                        onClick={() => setSelectedOption('option4')} 
-                        className="relative w-4 h-4 md:w-5 md:h-5 border-2 border-[#000000] flex items-center justify-center rounded-full overflow-hidden"
-                      >
-                        {/* 4 tərəfdən mərkəzə doğru dolma effekti */}
-                        <div className="absolute inset-0">
-                          <div className={`absolute top-0 left-0 h-full w-0 bg-[#000000] transition-all duration-300 ease-in-out ${
-                              selectedOption === 'option4' ? "w-1/2" : ""
-                            }`}
-                          ></div>
-                          <div className={`absolute top-0 right-0 h-full w-0 bg-[#000000] transition-all duration-300 ease-in-out ${
-                              selectedOption === 'option4' ? "w-1/2" : ""
-                            }`}
-                          ></div>
-                          <div className={`absolute top-0 left-0 w-full h-0 bg-[#000000] transition-all duration-300 ease-in-out ${
-                              selectedOption === 'option4' ? "h-1/2" : ""
-                            }`}
-                          ></div>
-                          <div className={`absolute bottom-0 left-0 w-full h-0 bg-[#000000] transition-all duration-300 ease-in-out ${
-                              selectedOption === 'option4' ? "h-1/2" : ""
-                            }`}
-                          ></div>
-                        </div>
-
-                        {selectedOption === 'option4' && <GoDotFill className="relative text-[#ffffff] text-[16px] md:text-[20px] z-10" />}
-                      </div>
-                      <div className="flex flex-col">
-                        <p className="text-[14px] md:text-[16px] text-[#000000] mb-1">
-                          Azərpoçt
-                        </p>
-                      </div>
-                    </div>
-                    <div>
-                      <p className="text-[14px] md:text-[18px] text-[#000000] font-bold">+ 4.50 AZN</p>
-                    </div>
-                  </label>
-
-                  <label className="flex flex-row items-start justify-between w-full mb-3 md:mb-5 cursor-pointer select-none">
-                    <div className="flex flex-row gap-2 ">
-                      <div 
-                        onClick={() => setSelectedOption('option5')} 
-                        className="relative w-4 h-4 md:w-5 md:h-5 border-2 border-[#000000] flex items-center justify-center rounded-full overflow-hidden"
-                      >
-                        {/* 4 tərəfdən mərkəzə doğru dolma effekti */}
-                        <div className="absolute inset-0">
-                          <div className={`absolute top-0 left-0 h-full w-0 bg-[#000000] transition-all duration-300 ease-in-out ${
-                              selectedOption === 'option5' ? "w-1/2" : ""
-                            }`}
-                          ></div>
-                          <div className={`absolute top-0 right-0 h-full w-0 bg-[#000000] transition-all duration-300 ease-in-out ${
-                              selectedOption === 'option5' ? "w-1/2" : ""
-                            }`}
-                          ></div>
-                          <div className={`absolute top-0 left-0 w-full h-0 bg-[#000000] transition-all duration-300 ease-in-out ${
-                              selectedOption === 'option5' ? "h-1/2" : ""
-                            }`}
-                          ></div>
-                          <div className={`absolute bottom-0 left-0 w-full h-0 bg-[#000000] transition-all duration-300 ease-in-out ${
-                              selectedOption === 'option5' ? "h-1/2" : ""
-                            }`}
-                          ></div>
-                        </div>
-
-                        {selectedOption === 'option5' && <GoDotFill className="relative text-[#ffffff] text-[16px] md:text-[20px] z-10" />}
-                      </div>
-                      <div className="flex flex-col">
-                        <p className="text-[14px] md:text-[16px] text-[#000000] mb-1">
-                          "Özün götür" xidməti
-                        </p>
-                      </div>
-                    </div>
-                    <div>
-                      <p className="text-[14px] md:text-[18px] text-[#000000] font-bold">0.50 AZN - 2.50 AZN</p>
-                    </div>
-                  </label>
-                </div>
-                <div className="relative w-full" ref={datePickerRef}>
-                  <label htmlFor="address" className="flex flex-col w-full">
-                    <p className="flex flex-row gap-1 text-[14px] md:text-[16px] text-[#000000] mb-1">
-                      Çatdırılma tarixi
-                      <span className="text-[#f50809]">*</span>
-                    </p>
-                  </label>
-                  <div
-                      className="relative p-3 border border-[#dddddd] rounded-md cursor-pointer flex items-center justify-between transition-colors duration-200"
-                      onClick={toggleDatePicker}
-                  >
-                      <div className="flex items-center space-x-2">
-                          <span className="text-[#000000]">{formatDate(selectedDate)}</span>
-                      </div>
-                  </div>
-                  {isOpen && (
-                      <div className="absolute z-40 mt-2 bg-[#ffffff] rounded-md shadow-lg border border-[#dddddd] w-full md:w-[480px]">
-                          <div className="flex p-4 relative">
-                              {/* Sol ay və sol ox */}
-                              <div className="w-1/2 flex justify-start items-center relative">
-                                  <button onClick={goToPrevMonth} className="p-2 text-[#000000] absolute left-0 cursor-pointer">
-                                      <FaArrowLeftLong />
-                                  </button>
-                                  <h3 className="flex-1 text-center text-base text-[#000000]">
-                                      {monthNames[currentMonth]} {currentYear}
-                                  </h3>
-                              </div>
-                              
-                              {/* Sağ ay və sağ ox */}
-                              <div className="w-1/2 flex justify-end items-center relative">
-                                  <h3 className="flex-1 text-center text-base text-[#000000]">
-                                      {monthNames[nextMonth]} {nextMonthYear}
-                                  </h3>
-                                  <button onClick={goToNextMonth} className="p-2 text-[#000000] absolute right-0 cursor-pointer">
-                                      <FaArrowRightLong />
-                                  </button>
-                              </div>
+                          <div className="absolute inset-0">
+                              <div className={`absolute top-0 left-0 h-full w-0 bg-[#000000] transition-all duration-300 ${checked ? "w-1/2" : ""}`}></div>
+                              <div className={`absolute top-0 right-0 h-full w-0 bg-[#000000] transition-all duration-300 ${checked ? "w-1/2" : ""}`}></div>
+                              <div className={`absolute top-0 left-0 w-full h-0 bg-[#000000] transition-all duration-300 ${checked ? "h-1/2" : ""}`}></div>
+                              <div className={`absolute bottom-0 left-0 w-full h-0 bg-[#000000] transition-all duration-300 ${checked ? "h-1/2" : ""}`}></div>
                           </div>
+                          {checked && <FaCheck className="text-white text-[8px] md:text-[10px] z-10" />}
+                      </div>
 
-                          <div className="flex p-4 pt-0">
+                      <div className="flex flex-col">
+                          <p
+                              className="text-[14px] md:text-[16px] text-[#000000] mb-1"
+                              onClick={() => setChecked(!checked)}
+                          >
+                              Qeydiyyatdan keçmək istərdiniz?
+                          </p>
+                          <span
+                              className="text-[14px] md:text-[16px] text-[#999999]"
+                              onClick={() => setChecked(!checked)}
+                          >
+                              Siz sifariş tarixçəsini görə biləcək, yeniliklər və endirimlər haqqında asanlıqla məlumat ala biləcəksiniz.
+                          </span>
+                      </div>
+                  </div>
+
+                  {/* Şifrə inputları - yalnız checked olduqda görünür */}
+                  {checked && (
+                      <div className="flex flex-col md:flex-row gap-4 md:gap-5 mt-3 w-full">
+                          <label htmlFor="reg-password" className="flex flex-col w-full mb-3 md:mb-5">
+                              <p className="flex flex-row gap-1 text-[14px] md:text-[16px] text-[#000000] mb-1">Şifrə
+                                  <span className="text-[#f50809]">*</span>
+                              </p>
+                              <div className="relative w-full">
+                                  <input
+                                      type={showPassword ? "text" : "password"}
+                                      id="reg-password"
+                                      className="w-full p-2 border border-[#dddddd] rounded-md outline-none pr-10"
+                                  />
+                                  <button
+                                      type="button"
+                                      onClick={(e) => {
+                                          e.stopPropagation();
+                                          setShowPassword(!showPassword);
+                                      }}
+                                      className="absolute inset-y-0 right-2 flex items-center text-[22px] text-[#000000] cursor-pointer"
+                                  >
+                                      {showPassword ? <FaRegEye /> : <FaRegEyeSlash />}
+                                  </button>
+                              </div>
+                          </label>
+                          <label htmlFor="confirm-password" className="flex flex-col w-full mb-3 md:mb-5">
+                              <p className="flex flex-row gap-1 text-[14px] md:text-[16px] text-[#000000] mb-1">Şifrəni təkrar edin
+                                  <span className="text-[#f50809]">*</span>
+                              </p>
+                              <div className="relative w-full">
+                                  <input
+                                      type={showPassword ? "text" : "password"}
+                                      id="confirm-password"
+                                      className="w-full p-2 border border-[#dddddd] rounded-md outline-none pr-10"
+                                  />
+                                  <button
+                                      type="button"
+                                      onClick={(e) => {
+                                          e.stopPropagation();
+                                          setShowPassword(!showPassword);
+                                      }}
+                                      className="absolute inset-y-0 right-2 flex items-center text-[22px] text-[#000000] cursor-pointer"
+                                  >
+                                      {showPassword ? <FaRegEye /> : <FaRegEyeSlash />}
+                                  </button>
+                              </div>
+                              <span className="text-[14px] md:text-[16px] text-[#999999]">
+                                  Parolda ən azı 6 latın simvolu olmalıdır
+                              </span>
+                          </label>
+                      </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Çatdırılma seçimləri */}
+              <div className="flex flex-col gap-4 mb-6">
+                {[
+                  { id: 'option1', title: 'Çatdırılma kuryer', desc: 'Bakı şəhəri üzrə 24 saat ərzində çatdırılma.', price: '+ 5 AZN' },
+                  { id: 'option2', title: 'Ekspress çatdırılma', desc: '1 saat ərzində çatdırılma (Hava şəraiti ilə əlaqədar sifarişlərdə gecikmələr ola bilər)', desc2: '20:00-dan sonra edilən Bakı üzrə şəhərdaxili sifarişlərin çatdırılması növbəti gün 9:00 - 10:00-dək baş tutacaq.', price: '+ 7 AZN' },
+                  { id: 'option3', title: 'Azərbaycanın bölgələrinə ekspress çatdırılma', desc: 'Sifariş edildikdən sonra cəmi 7 saat ərzində çatdırılır.', desc2: 'Naxçıvan MR və Şahdağ ərazilərinə ekspress çatdırılma qiyməti fərqli ola bilər.', desc3: 'Naxçıvan MR ekspress poçtla göndəriləcək.', price: '+ 10 AZN' },
+                  { id: 'option4', title: 'Azərpoçt', price: '+ 4.50 AZN' },
+                  { id: 'option5', title: '"Özün götür" xidməti', price: '0.50 AZN - 2.50 AZN' },
+                ].map((opt) => (
+                  <label
+                    key={opt.id}
+                    className="flex items-start justify-between w-full mb-3 cursor-pointer select-none"
+                    onClick={() => setSelectedOption(opt.id)}
+                  >
+                    <div className="flex gap-2 flex-1 items-start">
+                      <div className="relative w-4 h-4 md:w-5 md:h-5 border-2 border-[#000000] rounded-full flex items-center justify-center overflow-hidden flex-shrink-0">
+                          <div className="absolute inset-0">
+                              <div className={`absolute top-0 left-0 h-full w-0 bg-[#000000] transition-all duration-300 ${selectedOption === opt.id ? "w-1/2" : ""}`}></div>
+                              <div className={`absolute top-0 right-0 h-full w-0 bg-[#000000] transition-all duration-300 ${selectedOption === opt.id ? "w-1/2" : ""}`}></div>
+                              <div className={`absolute top-0 left-0 w-full h-0 bg-[#000000] transition-all duration-300 ${selectedOption === opt.id ? "h-1/2" : ""}`}></div>
+                              <div className={`absolute bottom-0 left-0 w-full h-0 bg-[#000000] transition-all duration-300 ${selectedOption === opt.id ? "h-1/2" : ""}`}></div>
+                          </div>
+                          {selectedOption === opt.id && <GoDotFill className="text-white text-[16px] md:text-[20px] z-10" />}
+                      </div>
+                      <div className="flex flex-col">
+                          <p className="text-[14px] md:text-[16px] text-[#000000]">{opt.title}</p>
+                          {opt.desc && <span className="text-[12px] md:text-[14px] text-[#999999]">{opt.desc}</span>}
+                          {opt.desc2 && <span className="text-[12px] md:text-[14px] text-[#999999]">{opt.desc2}</span>}
+                          {opt.desc3 && <span className="text-[12px] md:text-[14px] text-[#999999]">{opt.desc3}</span>}
+                      </div>
+                    </div>
+                    
+                    <p className="text-[14px] md:text-[18px] text-[#000000] font-bold whitespace-nowrap">{opt.price}</p>
+                  </label>
+                ))}
+              </div>
+
+              {/* Tarix seçimi */}
+              <div className="relative w-full mb-5" ref={datePickerRef}>
+                <label htmlFor="address" className="flex flex-col w-full">
+                  <p className="flex flex-row gap-1 text-[14px] md:text-[16px] text-[#000000] mb-1">
+                    Çatdırılma tarixi
+                    <span className="text-[#f50809]">*</span>
+                  </p>
+                </label>
+                <div
+                    className="relative p-3 border border-[#dddddd] rounded-md cursor-pointer flex items-center justify-between transition-colors duration-200"
+                    onClick={toggleDatePicker}
+                >
+                    <div className="flex items-center space-x-2">
+                        <span className="text-[#000000]">{formatDate(selectedDate)}</span>
+                    </div>
+                </div>
+                {isOpen && (
+                  <div className="absolute z-40 mt-0.5 bg-[#ffffff] rounded-md shadow-lg border border-[#dddddd] w-full md:w-[480px]">
+                      <div className="flex flex-col sm:flex-row gap-2 p-4">
+                          {/* Sol ay və sol ox */}
+                          <div className="w-full sm:w-1/2 flex flex-col gap-2 px-15 sm:px-2">
+                              <div className="flex justify-start items-center relative">
+                                <button onClick={goToPrevMonth} className="p-2 text-[#000000] absolute left-0 cursor-pointer">
+                                  <FaArrowLeftLong />
+                                </button>
+                                <h3 className="flex-1 text-center text-base text-[#000000]">
+                                    {monthNames[currentMonth]} {currentYear}
+                                </h3>
+                              </div>
                               {/* Cari ayın günləri */}
-                              <div className="w-1/2 pr-2">
+                              <div>
                                   <div className="grid grid-cols-7 text-center text-xs font-semibold text-[#000000] mb-2">
                                       {weekDays.map((day, index) => <span key={index}>{day}</span>)}
                                   </div>
@@ -1428,9 +1402,20 @@ function Cart() {
                                       ))}
                                   </div>
                               </div>
-
+                          </div>
+                          
+                          {/* Sağ ay və sağ ox */}
+                          <div className="w-full sm:w-1/2 flex flex-col gap-2 px-15 sm:px-2">
+                              <div className="flex justify-end items-center relative">
+                                <h3 className="flex-1 text-center text-base text-[#000000]">
+                                  {monthNames[nextMonth]} {nextMonthYear}
+                                </h3>
+                                <button onClick={goToNextMonth} className="p-2 text-[#000000] absolute right-0 cursor-pointer">
+                                    <FaArrowRightLong />
+                                </button>
+                              </div>
                               {/* Növbəti ayın günləri */}
-                              <div className="w-1/2 pl-2">
+                              <div>
                                   <div className="grid grid-cols-7 text-center text-xs font-semibold text-[#000000] mb-2">
                                       {weekDays.map((day, index) => <span key={index}>{day}</span>)}
                                   </div>
@@ -1455,627 +1440,77 @@ function Cart() {
                               </div>
                           </div>
                       </div>
-                  )}
-                </div>
-                <label htmlFor="delivery" className="flex flex-col w-full">
-                  <span className="text-[14px] md:text-[16px] text-[#000000] mb-1">
-                    Çatdırılma vaxtını seç
-                  </span>
-                  <select
-                    id="delivery"
-                    name="delivery"
-                    defaultValue=""
-                    className="border border-[#dddddd] rounded-md p-3 text-[14px] md:text-[16px] outline-none"
+                  </div>
+                )}
+              </div>
+
+              {/* Çatdırılma vaxtı */}
+              <label htmlFor="delivery" className="flex flex-col w-full mb-6">
+                <span className="text-[14px] md:text-[16px] text-[#000000] mb-1">Çatdırılma vaxtını seç</span>
+                <select
+                  id="delivery"
+                  name="delivery"
+                  defaultValue=""
+                  className="w-full p-3 border border-[#dddddd] rounded-md outline-none text-[14px]"
+                >
+                  <option value="" disabled hidden>Uyğun zamanı seçin</option>
+                  <option value="10:00-17:00">10:00-17:00</option>
+                  <option value="17:00-20:00">17:00-20:00</option>
+                </select>
+              </label>
+
+              {/* Ödəmə üsulu */}
+              <div className="flex flex-col mb-6">
+                <p className="text-[16px] md:text-[22px] text-[#000000] mb-4">
+                  Ödəmə üsulu <span className="text-[#f50809]">*</span>
+                </p>
+                {[
+                  { id: 'option1', title: 'Nağd pulla' },
+                  { id: 'option2', title: 'Million', subtitle: 'E-MANAT, M-PAY, EXPRESS-PAY' },
+                  { id: 'option3', title: 'Rusiya kartlar' },
+                  { id: 'option4', title: 'VISA | MasterCard' },
+                ].map((opt) => (
+                  <label
+                    key={opt.id}
+                    className="flex items-start justify-between w-full mb-3 cursor-pointer select-none"
+                    onClick={() => setPaymentOption(opt.id)}
                   >
-                    <option value="" disabled hidden>
-                      Uyğun zamanı seçin
-                    </option>
-                    <option value="10:00-17:00">10:00-17:00</option>
-                    <option value="17:00-20:00">17:00-20:00</option>
-                  </select>
-                </label>
-                <div className="flex flex-col">
-                  <p className="flex flex-row gap-1 text-[14px] md:text-[22px] text-[#000000] mb-5">
-                    Ödəmə üsulu
-                    <span className="text-[#f50809]">*</span>
-                  </p>
-
-                  {/* Nağd pulla */}
-                  <label className="flex flex-row items-start justify-between w-full mb-4 cursor-pointer select-none">
-                    <div className="flex flex-row gap-2 ">
-                      <div
-                        onClick={() => setPaymentOption("option1")}
-                        className="relative w-4 h-4 md:w-5 md:h-5 border-2 border-[#000000] flex items-center justify-center rounded-full overflow-hidden"
-                      >
-                        <div className="absolute inset-0">
-                          <div className={`absolute top-0 left-0 h-full w-0 bg-[#000000] transition-all duration-300 ease-in-out ${paymentOption === "option1" ? "w-1/2" : ""}`} />
-                          <div className={`absolute top-0 right-0 h-full w-0 bg-[#000000] transition-all duration-300 ease-in-out ${paymentOption === "option1" ? "w-1/2" : ""}`} />
-                          <div className={`absolute top-0 left-0 w-full h-0 bg-[#000000] transition-all duration-300 ease-in-out ${paymentOption === "option1" ? "h-1/2" : ""}`} />
-                          <div className={`absolute bottom-0 left-0 w-full h-0 bg-[#000000] transition-all duration-300 ease-in-out ${paymentOption === "option1" ? "h-1/2" : ""}`} />
-                        </div>
-                        {paymentOption === "option1" && (
-                          <GoDotFill className="relative text-[#ffffff] text-[16px] md:text-[20px] z-10" />
-                        )}
+                    <div className="flex gap-2 flex-1 items-start">
+                      <div className="relative w-4 h-4 md:w-5 md:h-5 border-2 border-[#000000] rounded-full flex items-center justify-center overflow-hidden flex-shrink-0">
+                          <div className="absolute inset-0">
+                              <div className={`absolute top-0 left-0 h-full w-0 bg-[#000000] transition-all duration-300 ${paymentOption === opt.id ? "w-1/2" : ""}`}></div>
+                              <div className={`absolute top-0 right-0 h-full w-0 bg-[#000000] transition-all duration-300 ${paymentOption === opt.id ? "w-1/2" : ""}`}></div>
+                              <div className={`absolute top-0 left-0 w-full h-0 bg-[#000000] transition-all duration-300 ${paymentOption === opt.id ? "h-1/2" : ""}`}></div>
+                              <div className={`absolute bottom-0 left-0 w-full h-0 bg-[#000000] transition-all duration-300 ${paymentOption === opt.id ? "h-1/2" : ""}`}></div>
+                          </div>
+                          {paymentOption === opt.id && <GoDotFill className="text-white text-[16px] md:text-[20px] z-10" />}
                       </div>
                       <div className="flex flex-col">
-                        <p className="text-[14px] md:text-[18px] text-[#000000] mb-1">
-                          Nağd pulla
-                        </p>
+                          <p className="text-[14px] md:text-[16px] text-[#000000]">{opt.title}</p>
+                          {opt.subtitle && <span className="text-[12px] text-[#999999]">{opt.subtitle}</span>}
                       </div>
                     </div>
                   </label>
-
-                  {/* Million */}
-                  <label className="flex flex-row items-start justify-between w-full mb-4 cursor-pointer select-none">
-                    <div className="flex flex-row gap-2 ">
-                      <div
-                        onClick={() => setPaymentOption("option2")}
-                        className="relative w-4 h-4 md:w-5 md:h-5 border-2 border-[#000000] flex items-center justify-center rounded-full overflow-hidden"
-                      >
-                        <div className="absolute inset-0">
-                          <div className={`absolute top-0 left-0 h-full w-0 bg-[#000000] transition-all duration-300 ease-in-out ${paymentOption === "option2" ? "w-1/2" : ""}`} />
-                          <div className={`absolute top-0 right-0 h-full w-0 bg-[#000000] transition-all duration-300 ease-in-out ${paymentOption === "option2" ? "w-1/2" : ""}`} />
-                          <div className={`absolute top-0 left-0 w-full h-0 bg-[#000000] transition-all duration-300 ease-in-out ${paymentOption === "option2" ? "h-1/2" : ""}`} />
-                          <div className={`absolute bottom-0 left-0 w-full h-0 bg-[#000000] transition-all duration-300 ease-in-out ${paymentOption === "option2" ? "h-1/2" : ""}`} />
-                        </div>
-                        {paymentOption === "option2" && (
-                          <GoDotFill className="relative text-[#ffffff] text-[16px] md:text-[20px] z-10" />
-                        )}
-                      </div>
-                      <div className="flex flex-col">
-                        <p className="text-[14px] md:text-[18px] text-[#000000]">Million</p>
-                        <span className="text-[14px] md:text-[18px] text-[#999999] font-semibold">
-                          E-MANAT, M-PAY, EXPRESS-PAY
-                        </span>
-                      </div>
-                    </div>
-                  </label>
-
-                  {/* Rusiya kartlar */}
-                  <label className="flex flex-row items-start justify-between w-full mb-4 cursor-pointer select-none">
-                    <div className="flex flex-row gap-2 ">
-                      <div
-                        onClick={() => setPaymentOption("option3")}
-                        className="relative w-4 h-4 md:w-5 md:h-5 border-2 border-[#000000] flex items-center justify-center rounded-full overflow-hidden"
-                      >
-                        <div className="absolute inset-0">
-                          <div className={`absolute top-0 left-0 h-full w-0 bg-[#000000] transition-all duration-300 ease-in-out ${paymentOption === "option3" ? "w-1/2" : ""}`} />
-                          <div className={`absolute top-0 right-0 h-full w-0 bg-[#000000] transition-all duration-300 ease-in-out ${paymentOption === "option3" ? "w-1/2" : ""}`} />
-                          <div className={`absolute top-0 left-0 w-full h-0 bg-[#000000] transition-all duration-300 ease-in-out ${paymentOption === "option3" ? "h-1/2" : ""}`} />
-                          <div className={`absolute bottom-0 left-0 w-full h-0 bg-[#000000] transition-all duration-300 ease-in-out ${paymentOption === "option3" ? "h-1/2" : ""}`} />
-                        </div>
-                        {paymentOption === "option3" && (
-                          <GoDotFill className="relative text-[#ffffff] text-[16px] md:text-[20px] z-10" />
-                        )}
-                      </div>
-                      <div className="flex flex-col">
-                        <p className="text-[14px] md:text-[18px] text-[#000000] mb-1">
-                          Rusiya kartlar
-                        </p>
-                      </div>
-                    </div>
-                  </label>
-
-                  {/* VISA | MasterCard */}
-                  <label className="flex flex-row items-start justify-between w-full cursor-pointer select-none">
-                    <div className="flex flex-row gap-2 ">
-                      <div
-                        onClick={() => setPaymentOption("option4")}
-                        className="relative w-4 h-4 md:w-5 md:h-5 border-2 border-[#000000] flex items-center justify-center rounded-full overflow-hidden"
-                      >
-                        <div className="absolute inset-0">
-                          <div className={`absolute top-0 left-0 h-full w-0 bg-[#000000] transition-all duration-300 ease-in-out ${paymentOption === "option4" ? "w-1/2" : ""}`} />
-                          <div className={`absolute top-0 right-0 h-full w-0 bg-[#000000] transition-all duration-300 ease-in-out ${paymentOption === "option4" ? "w-1/2" : ""}`} />
-                          <div className={`absolute top-0 left-0 w-full h-0 bg-[#000000] transition-all duration-300 ease-in-out ${paymentOption === "option4" ? "h-1/2" : ""}`} />
-                          <div className={`absolute bottom-0 left-0 w-full h-0 bg-[#000000] transition-all duration-300 ease-in-out ${paymentOption === "option4" ? "h-1/2" : ""}`} />
-                        </div>
-                        {paymentOption === "option4" && (
-                          <GoDotFill className="relative text-[#ffffff] text-[16px] md:text-[20px] z-10" />
-                        )}
-                      </div>
-                      <div className="flex flex-col">
-                        <p className="text-[14px] md:text-[18px] text-[#000000] mb-1">
-                          VISA | MasterCard
-                        </p>
-                      </div>
-                    </div>
-                  </label>
-                </div>
-                <label htmlFor="notes" className="flex flex-col w-full">
-                  <span className="text-[14px] md:text-[16px] text-[#000000] mb-1">
-                    Sifarişə aid qeydlər
-                  </span>
-                  <textarea
-                    id="notes"
-                    name="notes"
-                    className="w-full h-[70px] p-2 border border-[#dddddd] rounded-md outline-none resize-none"
-                  ></textarea>
-                </label>
-                <button className="w-full py-3 text-[14px] md:text-[16px] text-[#ffffff] bg-[#dc0708] hover:bg-[#f50809] rounded-md cursor-pointer transition-colors duration-300">
-                  Sifarişi təsdiq edin
-                </button>
+                ))}
               </div>
-            </div>
 
-            {/* Səbətdəki məhsullar (sağ tərəf) */}
-            <div className="flex flex-col gap-4 w-1/2 border border-[#dddddd] rounded-md p-5">
-              {cartProducts.map((product) => {
-                const quantity = product.quantity || 1;
-                const unitPrice = product.variants?.[0]?.price || 0;
-                return (
-                  <div key={product.id} className="flex items-center gap-3 w-full">
-                    <Link to={`/products/${product.permalink}`}>
-                      <img
-                        src={product.first_image?.medium_url}
-                        alt={product.title}
-                        className="w-10 h-16 object-cover"
-                      />
-                    </Link>
-                    <div className="flex flex-col flex-1 self-center">
-                      <Link to={`/products/${product.permalink}`} className="text-[16px] text-[#000000] hover:text-[#f50809] transition-colors duration-300 font-normal">
-                        {product.title}
-                      </Link>
-                      
-                    </div>
-                    <span className="text-[16px] text-[#000000] font-semibold">
-                      {quantity} x {unitPrice} AZN
-                    </span>
-                  </div>
-                );
-              })}
-              {cartProducts.length > 0 && (
-                <>
-                  <div className="flex flex-col justify-center gap-2 bg-[#ffffff] border-y border-[#dddddd] py-5 mt-2">
-                    <p className="text-[16px] text-[#000000] font-normal">
-                      Promokod və ya endirim kuponu (Hər sifarişdə yalnız bir promokod istifadə etmək mümkündür)
-                    </p>
-                    <div className="flex flex-row items-center gap-2">
-                      <div className="relative w-[500px]">
-                        <input
-                          type="text"
-                          placeholder="Kuponun kodunu qeyd edin"
-                          className="border border-[#dddddd] px-4 py-2.5 rounded-md w-full outline-none placeholder:text-[14px] placeholder:md:text-[16px]"
-                        />
-                      </div>
-                      <p className="text-[14px] text-[#000000] hover:text-[#f50809] font-normal border-b border-dashed border-[#000000] hover:border-[#f50809] cursor-pointer">
-                        Qəbul etmək
-                      </p>
-                    </div>
-                    <div className="flex flex-col mt-2">
-                      <div className="flex flex-row items-center justify-between">
-                        <p className="text-[14px] md:text-[16px] text-[#000000]">Məhsullar üzrə məbləğ</p>
-                        <span className="text-[14px] md:text-[16px] text-[#000000] font-medium">{totalAmount} AZN</span>
-                      </div>
-                      <div className="flex flex-row items-center justify-between">
-                        <p className="text-[14px] md:text-[16px] text-[#000000]">Çatdırılma xərcləri</p>
-                        <span className="text-[14px] md:text-[16px] text-[#000000] font-medium">{getDeliveryPrice()}</span>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex flex-row items-center justify-between">
-                    <p className="text-[14px] md:text-[20px] text-[#000000]">NƏTİCƏ:</p>
-                    <span className="text-[14px] md:text-[20px] text-[#000000] font-semibold">{totalPrice} AZN</span>
-                  </div>
-                </>
-              )}
+              {/* Qeydlər */}
+              <label htmlFor="notes" className="flex flex-col w-full mb-6">
+                <span className="text-[14px] md:text-[16px] text-[#000000] mb-1">Sifarişə aid qeydlər</span>
+                <textarea
+                  id="notes"
+                  name="notes"
+                  className="w-full h-16 p-2 border border-[#dddddd] rounded-md outline-none resize-none text-[14px]"
+                ></textarea>
+              </label>
+
+              {/* Sifarişi təsdiq et düyməsi */}
+              <button className="w-full py-3 text-[14px] md:text-[16px] text-white bg-[#dc0708] hover:bg-[#f50809] rounded-md transition-colors duration-300">
+                Sifarişi təsdiq edin
+              </button>
             </div>
           </div>
         )}
-
-{showOrderForm && (
-  <div className="flex flex-col md:flex-row items-start justify-between gap-8 my-5">
-    {/* Səbət (mobil: yuxarı, desktop: sağ) */}
-    <div className="flex flex-col gap-4 w-full md:w-1/2 order-1 md:order-2 border border-[#dddddd] rounded-md p-4 md:p-5">
-      {cartProducts.map((product) => {
-        const quantity = product.quantity || 1;
-        const unitPrice = product.variants?.[0]?.price || 0;
-        return (
-          <div key={product.id} className="flex items-center gap-3 w-full">
-            <Link to={`/products/${product.permalink}`}>
-              <img
-                src={product.first_image?.medium_url}
-                alt={product.title}
-                className="w-10 h-16 object-cover rounded"
-              />
-            </Link>
-            <div className="flex flex-col flex-1">
-              <Link
-                to={`/products/${product.permalink}`}
-                className="text-[14px] md:text-[16px] text-[#000000] hover:text-[#f50809] transition-colors duration-300 font-normal line-clamp-2"
-              >
-                {product.title}
-              </Link>
-            </div>
-            <span className="text-[14px] md:text-[16px] text-[#000000] font-semibold whitespace-nowrap">
-              {quantity} × {unitPrice} AZN
-            </span>
-          </div>
-        );
-      })}
-
-      {cartProducts.length > 0 && (
-        <>
-          <div className="flex flex-col gap-3 bg-[#ffffff] border-y border-[#dddddd] py-4 mt-3">
-            <p className="text-[14px] md:text-[16px] text-[#000000] font-normal">
-              Promokod və ya endirim kuponu (Hər sifarişdə yalnız bir promokod istifadə etmək mümkündür)
-            </p>
-            <div className="flex flex-row items-center gap-2">
-              <div className="relative w-[500px]">
-                <input
-                type="text"
-                placeholder="Kuponun kodunu qeyd edin"
-                className="border border-[#dddddd] px-4 py-2.5 rounded-md w-full outline-none text-[14px]"
-              />
-              </div>
-              <p className="text-[12px] md:text-[14px] text-[#000000] hover:text-[#f50809] font-normal border-b border-dashed border-[#000000] hover:border-[#f50809] cursor-pointer">
-                Qəbul etmək
-              </p>
-            </div>
-            <div className="flex flex-col mt-2">
-              <div className="flex justify-between text-[14px] md:text-[16px] text-[#000000]">
-                <span>Məhsullar üzrə məbləğ</span>
-                <span className="font-medium">{totalAmount} AZN</span>
-              </div>
-              <div className="flex justify-between text-[14px] md:text-[16px] text-[#000000] mt-1">
-                <span>Çatdırılma xərcləri</span>
-                <span className="font-medium">{getDeliveryPrice()}</span>
-              </div>
-            </div>
-          </div>
-          <div className="flex justify-between items-center">
-            <p className="text-[16px] md:text-[20px] text-[#000000] font-normal">NƏTİCƏ:</p>
-            <span className="text-[16px] md:text-[20px] text-[#000000] font-semibold">{totalPrice} AZN</span>
-          </div>
-        </>
-      )}
-    </div>
-
-    {/* Sifariş formu (mobil: aşağı, desktop: sol) */}
-    <div className="flex flex-col w-full md:w-1/2 order-2 md:order-1">
-      {/* Giriş düyməsi */}
-      <div className="flex flex-col gap-1 mb-4">
-        <span className="text-[14px] text-[#999999]">Məsələn: +994 111-11-11</span>
-        <button className="w-full py-3 text-[14px] text-white bg-[#dc0708] hover:bg-[#1a6bff] rounded-md transition-colors duration-300">
-          Qeydiyyatdan keçmiş alıcılar üçün daxil olun
-        </button>
-      </div>
-
-      {/* Çatdırılma təfərrüatları */}
-      <div className="flex flex-col gap-4 mb-6">
-        <h4 className="text-[16px] md:text-[22px] text-[#000000] font-medium">Çatdırılma xidməti təfərrüatları:</h4>
-        <label htmlFor="fullname" className="flex flex-col w-full">
-          <p className="text-[14px] md:text-[16px] text-[#000000] mb-1">
-            Şəxsi əlaqə (Adı, soyadı, atasının adı) <span className="text-[#f50809]">*</span>
-          </p>
-          <input
-            type="text"
-            id="fullname"
-            className="w-full p-2 border border-[#dddddd] rounded-md outline-none text-[14px]"
-          />
-        </label>
-        <label htmlFor="reg-email" className="flex flex-col w-full">
-          <p className="text-[14px] md:text-[16px] text-[#000000] mb-1">
-            Elektron ünvan <span className="text-[#f50809]">*</span>
-          </p>
-          <input
-            type="email"
-            id="reg-email"
-            className="w-full p-2 border border-[#dddddd] rounded-md outline-none text-[14px]"
-          />
-        </label>
-        <label htmlFor="phone" className="flex flex-col w-full">
-          <p className="text-[14px] md:text-[16px] text-[#000000] mb-1">
-            Əlaqə nömrəsi (sifarişin detallarını dəqiqləşdirmək üçün) <span className="text-[#f50809]">*</span>
-          </p>
-          <input
-            type="tel"
-            id="phone"
-            className="w-full p-2 border border-[#dddddd] rounded-md outline-none text-[14px]"
-          />
-        </label>
-      </div>
-
-      {/* Çatdırılma */}
-      <div className="flex flex-col gap-5 mb-6">
-        <h4 className="text-[16px] md:text-[22px] text-[#000000] font-medium">Çatdırılma</h4>
-        <label htmlFor="country" className="flex flex-col w-full">
-          <p className="text-[14px] md:text-[16px] text-[#000000] mb-1">
-            Ölkə <span className="text-[#f50809]">*</span>
-          </p>
-          <select
-            id="country"
-            name="shipping_address[country]"
-            value={selectedCountry}
-            onChange={(e) => setSelectedCountry(e.target.value)}
-            className="w-full p-3 border border-[#dddddd] rounded-md outline-none text-[14px]"
-          >
-            {countrys.map((country) => (
-              <option key={country.code} value={country.code}>
-                {country.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label htmlFor="city" className="flex flex-col w-full">
-          <p className="text-[14px] md:text-[16px] text-[#000000] mb-1">
-            Şəhər <span className="text-[#f50809]">*</span>
-          </p>
-          {selectedCountry === 'AZ' ? (
-            <select
-              id="city"
-              name="shipping_address[city]"
-              value={selectedCity}
-              onChange={(e) => setSelectedCity(e.target.value)}
-              className="w-full p-3 border border-[#dddddd] rounded-md outline-none text-[14px]"
-            >
-              {citys.map((city) => (
-                <option key={city.code} value={city.code}>
-                  {city.name}
-                </option>
-              ))}
-            </select>
-          ) : (
-            <input
-              type="text"
-              id="city"
-              name="shipping_address[city]"
-              value={selectedCity}
-              onChange={(e) => setSelectedCity(e.target.value)}
-              placeholder="Şəhəri yazın"
-              className="w-full p-2 border border-[#dddddd] rounded-md outline-none text-[14px]"
-            />
-          )}
-        </label>
-        <label htmlFor="address" className="flex flex-col w-full">
-          <span className="text-[14px] md:text-[16px] text-[#000000] mb-1">Ünvan</span>
-          <textarea
-            id="address"
-            name="address"
-            placeholder="Küçə, ev, mərtəbə"
-            className="w-full h-16 p-2 border border-[#dddddd] rounded-md outline-none resize-none text-[14px]"
-          ></textarea>
-        </label>
-      </div>
-
-      {/* Alıcı */}
-      <div className="flex flex-col gap-5 mb-6">
-        <h4 className="text-[16px] md:text-[22px] text-[#000000] font-medium">Alıcı</h4>
-        <label htmlFor="recipient-phone" className="flex flex-col w-full mb-3">
-          <p className="text-[14px] md:text-[16px] text-[#000000] mb-1">Sifarişi alan şəxsin nömrəsi</p>
-          <input
-            type="tel"
-            id="recipient-phone"
-            className="w-full p-3 border border-[#dddddd] rounded-md outline-none text-[14px]"
-          />
-          <span className="text-[14px] text-[#999999] mt-1">
-            Lütfən, sifarişi təhvil alacaq şəxsin nömrəsini qeyd edin
-          </span>
-        </label>
-
-        <label className="flex gap-2 w-full items-start cursor-pointer select-none">
-          <div
-            onClick={() => setChecked(!checked)}
-            className="relative w-4 h-4 md:w-5 md:h-5 border-2 border-[#000000] flex items-center justify-center overflow-hidden"
-          >
-            <div className="absolute inset-0">
-              <div className={`absolute top-0 left-0 h-full w-0 bg-[#000000] transition-all duration-300 ${checked ? "w-1/2" : ""}`}></div>
-              <div className={`absolute top-0 right-0 h-full w-0 bg-[#000000] transition-all duration-300 ${checked ? "w-1/2" : ""}`}></div>
-              <div className={`absolute top-0 left-0 w-full h-0 bg-[#000000] transition-all duration-300 ${checked ? "h-1/2" : ""}`}></div>
-              <div className={`absolute bottom-0 left-0 w-full h-0 bg-[#000000] transition-all duration-300 ${checked ? "h-1/2" : ""}`}></div>
-            </div>
-            {checked && <FaCheck className="text-white text-[8px] md:text-[10px] z-10" />}
-          </div>
-          <div className="flex flex-col">
-            <p className="text-[14px] md:text-[16px] text-[#000000] mb-1">
-              Qeydiyyatdan keçmək istərdiniz?
-            </p>
-            <span className="text-[14px] md:text-[16px] text-[#999999]">
-              Sifariş tarixçəsi, yeniliklər və endirimlər üçün
-            </span>
-          </div>
-        </label>
-      </div>
-
-      {/* Çatdırılma seçimləri */}
-      <div className="flex flex-col gap-4 mb-6">
-        {[
-          { id: 'option1', title: 'Çatdırılma kuryer (free)', desc: 'Bakı şəhəri üzrə 24 saat ərzində çatdırılma.', price: '+ 5 AZN' },
-          { id: 'option2', title: 'Ekspress çatdırılma', desc: '1 saat ərzində çatdırılma (Hava şəraiti ilə əlaqədar sifarişlərdə gecikmələr ola bilər)', desc2: '20:00-dan sonra edilən Bakı üzrə şəhərdaxili sifarişlərin çatdırılması növbəti gün 9:00 - 10:00-dək baş tutacaq.', price: '+ 7 AZN' },
-          { id: 'option3', title: 'Azərbaycanın bölgələrinə ekspress çatdırılma', desc: 'Sifariş edildikdən sonra cəmi 7 saat ərzində çatdırılır.', desc2: 'Naxçıvan MR və Şahdağ ərazilərinə ekspress çatdırılma qiyməti fərqli ola bilər.', desc3: 'Naxçıvan MR ekspress poçtla göndəriləcək.', price: '+ 10 AZN' },
-          { id: 'option4', title: 'Azərpoçt', price: '+ 4.50 AZN' },
-          { id: 'option5', title: '"Özün götür" xidməti', price: '0.50 AZN - 2.50 AZN' },
-        ].map((opt) => (
-          <label
-            key={opt.id}
-            className="flex items-start justify-between w-full mb-3 cursor-pointer select-none"
-            onClick={() => setSelectedOption(opt.id)}
-          >
-            <div className="flex gap-2 flex-1">
-              <div className="relative w-4 h-4 md:w-5 md:h-5 border-2 border-[#000000] rounded-full flex items-center justify-center overflow-hidden">
-                <div className="absolute inset-0">
-                  <div className={`absolute top-0 left-0 h-full w-0 bg-[#000000] transition-all duration-300 ${selectedOption === opt.id ? "w-1/2" : ""}`}></div>
-                  <div className={`absolute top-0 right-0 h-full w-0 bg-[#000000] transition-all duration-300 ${selectedOption === opt.id ? "w-1/2" : ""}`}></div>
-                  <div className={`absolute top-0 left-0 w-full h-0 bg-[#000000] transition-all duration-300 ${selectedOption === opt.id ? "h-1/2" : ""}`}></div>
-                  <div className={`absolute bottom-0 left-0 w-full h-0 bg-[#000000] transition-all duration-300 ${selectedOption === opt.id ? "h-1/2" : ""}`}></div>
-                </div>
-                {selectedOption === opt.id && <GoDotFill className="text-white text-[16px] md:text-[20px] z-10" />}
-              </div>
-              <div className="flex flex-col">
-                <p className="text-[14px] md:text-[16px] text-[#000000]">{opt.title}</p>
-                {opt.desc && <span className="text-[12px] md:text-[14px] text-[#999999]">{opt.desc}</span>}
-                {opt.desc2 && <span className="text-[12px] md:text-[14px] text-[#999999]">{opt.desc2}</span>}
-                {opt.desc3 && <span className="text-[12px] md:text-[14px] text-[#999999]">{opt.desc3}</span>}
-              </div>
-            </div>
-            <p className="text-[14px] md:text-[18px] text-[#000000] font-bold whitespace-nowrap">{opt.price}</p>
-          </label>
-        ))}
-      </div>
-
-      {/* Tarix seçimi */}
-      <div className="relative w-full" ref={datePickerRef}>
-        <label htmlFor="address" className="flex flex-col w-full">
-          <p className="flex flex-row gap-1 text-[14px] md:text-[16px] text-[#000000] mb-1">
-            Çatdırılma tarixi
-            <span className="text-[#f50809]">*</span>
-          </p>
-        </label>
-        <div
-            className="relative p-3 border border-[#dddddd] rounded-md cursor-pointer flex items-center justify-between transition-colors duration-200"
-            onClick={toggleDatePicker}
-        >
-            <div className="flex items-center space-x-2">
-                <span className="text-[#000000]">{formatDate(selectedDate)}</span>
-            </div>
-        </div>
-        {isOpen && (
-          <div className="absolute z-40 mt-0.5 bg-[#ffffff] rounded-md shadow-lg border border-[#dddddd] w-full md:w-[480px]">
-              <div className="flex flex-col sm:flex-row gap-2 p-4">
-                  {/* Sol ay və sol ox */}
-                  <div className="w-full sm:w-1/2 flex flex-col gap-2 px-15 sm:px-2">
-                      <div className="flex justify-start items-center relative">
-                        <button onClick={goToPrevMonth} className="p-2 text-[#000000] absolute left-0 cursor-pointer">
-                          <FaArrowLeftLong />
-                        </button>
-                        <h3 className="flex-1 text-center text-base text-[#000000]">
-                            {monthNames[currentMonth]} {currentYear}
-                        </h3>
-                      </div>
-                      {/* Cari ayın günləri */}
-                      <div>
-                          <div className="grid grid-cols-7 text-center text-xs font-semibold text-[#000000] mb-2">
-                              {weekDays.map((day, index) => <span key={index}>{day}</span>)}
-                          </div>
-                          <div className="grid grid-cols-7 text-center">
-                              {daysOfCurrentMonth.map((dateInfo, index) => (
-                                  <div
-                                      key={index}
-                                      onClick={() => dateInfo.isCurrentMonth && handleDayClick(dateInfo.day, dateInfo.month)}
-                                      className={`p-1 cursor-pointer text-sm transition-colors duration-200 ${
-                                          !dateInfo.isCurrentMonth ? 'text-[#a1a1a1] cursor-not-allowed' :
-                                          selectedDate.getDate() === dateInfo.day &&
-                                          selectedDate.getMonth() === dateInfo.month &&
-                                          selectedDate.getFullYear() === currentYear
-                                              ? 'bg-[#dc0708] text-[#ffffff] rounded-md'
-                                              : 'text-[#000000]'
-                                      }`}
-                                  >
-                                      {dateInfo.day}
-                                  </div>
-                              ))}
-                          </div>
-                      </div>
-                  </div>
-                  
-                  {/* Sağ ay və sağ ox */}
-                  <div className="w-full sm:w-1/2 flex flex-col gap-2 px-15 sm:px-2">
-                      <div className="flex justify-end items-center relative">
-                        <h3 className="flex-1 text-center text-base text-[#000000]">
-                          {monthNames[nextMonth]} {nextMonthYear}
-                        </h3>
-                        <button onClick={goToNextMonth} className="p-2 text-[#000000] absolute right-0 cursor-pointer">
-                            <FaArrowRightLong />
-                        </button>
-                      </div>
-                      {/* Növbəti ayın günləri */}
-                      <div>
-                          <div className="grid grid-cols-7 text-center text-xs font-semibold text-[#000000] mb-2">
-                              {weekDays.map((day, index) => <span key={index}>{day}</span>)}
-                          </div>
-                          <div className="grid grid-cols-7 text-center">
-                              {daysOfNextMonth.map((dateInfo, index) => (
-                                  <div
-                                      key={index}
-                                      onClick={() => dateInfo.isCurrentMonth && handleDayClick(dateInfo.day, dateInfo.month)}
-                                      className={`p-1 cursor-pointer text-sm transition-colors duration-200 ${
-                                          !dateInfo.isCurrentMonth ? 'text-[#a1a1a1] cursor-not-allowed' :
-                                          selectedDate.getDate() === dateInfo.day &&
-                                          selectedDate.getMonth() === dateInfo.month &&
-                                          selectedDate.getFullYear() === nextMonthYear
-                                              ? 'bg-[#dc0708] text-[#ffffff] rounded-md'
-                                              : 'text-[#000000]'
-                                      }`}
-                                  >
-                                      {dateInfo.day}
-                                  </div>
-                              ))}
-                          </div>
-                      </div>
-                  </div>
-              </div>
-          </div>
-        )}
-      </div>
-
-      
-
-      {/* Çatdırılma vaxtı */}
-      <label htmlFor="delivery" className="flex flex-col w-full mb-6">
-        <span className="text-[14px] md:text-[16px] text-[#000000] mb-1">Çatdırılma vaxtını seç</span>
-        <select
-          id="delivery"
-          name="delivery"
-          defaultValue=""
-          className="w-full p-3 border border-[#dddddd] rounded-md outline-none text-[14px]"
-        >
-          <option value="" disabled hidden>Uyğun zamanı seçin</option>
-          <option value="10:00-17:00">10:00-17:00</option>
-          <option value="17:00-20:00">17:00-20:00</option>
-        </select>
-      </label>
-
-      {/* Ödəmə üsulu */}
-      <div className="flex flex-col mb-6">
-        <p className="text-[16px] md:text-[22px] text-[#000000] mb-4">
-          Ödəmə üsulu <span className="text-[#f50809]">*</span>
-        </p>
-        {[
-          { id: 'option1', title: 'Nağd pulla' },
-          { id: 'option2', title: 'Million', subtitle: 'E-MANAT, M-PAY, EXPRESS-PAY' },
-          { id: 'option3', title: 'Rusiya kartlar' },
-          { id: 'option4', title: 'VISA | MasterCard' },
-        ].map((opt) => (
-          <label
-            key={opt.id}
-            className="flex items-start justify-between w-full mb-3 cursor-pointer select-none"
-            onClick={() => setPaymentOption(opt.id)}
-          >
-            <div className="flex gap-2 flex-1">
-              <div className="relative w-4 h-4 md:w-5 md:h-5 border-2 border-[#000000] rounded-full flex items-center justify-center overflow-hidden">
-                <div className="absolute inset-0">
-                  <div className={`absolute top-0 left-0 h-full w-0 bg-[#000000] transition-all duration-300 ${paymentOption === opt.id ? "w-1/2" : ""}`}></div>
-                  <div className={`absolute top-0 right-0 h-full w-0 bg-[#000000] transition-all duration-300 ${paymentOption === opt.id ? "w-1/2" : ""}`}></div>
-                  <div className={`absolute top-0 left-0 w-full h-0 bg-[#000000] transition-all duration-300 ${paymentOption === opt.id ? "h-1/2" : ""}`}></div>
-                  <div className={`absolute bottom-0 left-0 w-full h-0 bg-[#000000] transition-all duration-300 ${paymentOption === opt.id ? "h-1/2" : ""}`}></div>
-                </div>
-                {paymentOption === opt.id && <GoDotFill className="text-white text-[16px] md:text-[20px] z-10" />}
-              </div>
-              <div className="flex flex-col">
-                <p className="text-[14px] md:text-[16px] text-[#000000]">{opt.title}</p>
-                {opt.subtitle && <span className="text-[12px] text-[#999999]">{opt.subtitle}</span>}
-              </div>
-            </div>
-          </label>
-        ))}
-      </div>
-
-      {/* Qeydlər */}
-      <label htmlFor="notes" className="flex flex-col w-full mb-6">
-        <span className="text-[14px] md:text-[16px] text-[#000000] mb-1">Sifarişə aid qeydlər</span>
-        <textarea
-          id="notes"
-          name="notes"
-          className="w-full h-16 p-2 border border-[#dddddd] rounded-md outline-none resize-none text-[14px]"
-        ></textarea>
-      </label>
-
-      {/* Sifarişi təsdiq et düyməsi */}
-      <button className="w-full py-3 text-[14px] md:text-[16px] text-white bg-[#dc0708] hover:bg-[#f50809] rounded-md transition-colors duration-300">
-        Sifarişi təsdiq edin
-      </button>
-    </div>
-  </div>
-)}
 
         {/* Sabitlənmiş bar */}
         {cartProducts.length > 0 && !showOrderForm && (
@@ -2362,7 +1797,7 @@ function Cart() {
      
       {/* Baxdığınız Məhsullar */}
       {!showOrderForm && filteredViewedProducts.length > 0 && (
-        <div className="w-full mt-5">
+        <div className="w-full md:my-5">
           <div className="flex flex-col max-w-[1428px] mx-auto px-4 lg:px-16">
             <div className="flex flex-row items-center gap-6">
               <h2 className="text-[24px] sm:text-[28px] md:text-[32px] text-[#000000] font-normal">
@@ -2901,6 +2336,65 @@ function Cart() {
         </div>
       )}
 
+      {/* Giriş Modalı */}
+      {isLoginOpen && (
+        <div className="fixed inset-0 bg-[#0a0a0a98] flex items-center justify-center p-2 z-50" onClick={closeLoginModal}>
+          <div className="w-[400px] h-auto p-5 bg-[#ffffff] rounded-md relative" onClick={(e) => e.stopPropagation()}>
+            <button
+              onClick={closeLoginModal}
+              className="absolute top-3 right-3 text-[#000000] z-10 cursor-pointer"
+            >
+              <RiCloseFill className="text-[26px]" />
+            </button>
+            <div className="pt-8">
+              <label htmlFor="email" className="flex flex-col w-full mb-3 md:mb-5">
+                <p className="flex flex-row gap-1 text-[14px] md:text-[16px] text-[#000000] mb-1">E-mail
+                  <span className="text-[#f50809]">*</span>
+                </p>
+                <input
+                  type="email"
+                  id="email"
+                  placeholder="Telefon və yaxud E-mail"
+                  className="w-full py-2 px-4 border border-[#dddddd] rounded-md outline-none"
+                />
+              </label>
+              <label htmlFor="password" className="flex flex-col w-full mb-3 md:mb-5">
+                <p className="flex flex-row gap-1 text-[14px] md:text-[16px] text-[#000000] mb-1">Şifrə
+                  <span className="text-[#f50809]">*</span>
+                </p>
+                <div className="relative w-full">
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    id="password"
+                    placeholder="Şifrə"
+                    className="w-full py-2 px-4 border border-[#dddddd] rounded-md outline-none pr-10"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute inset-y-0 right-2 flex items-center text-[22px] text-[#000000] cursor-pointer"
+                  >
+                    {showPassword ? <FaRegEye /> : <FaRegEyeSlash />}
+                  </button>
+                </div>
+              </label>
+              
+              <div className="flex flex-row gap-5 items-center text-[14px] md:text-[16px] text-[#000000]">
+                <button className="p-6 py-3 text-[14px] md:text-[16px] text-[#ffffff] bg-[#dc0708] hover:bg-[#f50809] rounded-md cursor-pointer transition-colors duration-300">
+                  Daxil olun
+                </button>
+                <Link to={'/user?tab=recovery'}
+                  onClick={showRecoveryForm}
+                  className="border-b border-dashed border-[#000000] hover:border-[#f50809] hover:text-[#f50809] cursor-pointer transition-colors duration-300 text-center whitespace-nowrap"
+                >
+                  Şifrəni bərpa edin
+                </Link>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Scroll Top Düyməsi */}
       {showScrollTop && (
         <div className="fixed bottom-8 right-8 z-50">
@@ -2975,4 +2469,3 @@ function Cart() {
 }
 
 export default Cart;
-

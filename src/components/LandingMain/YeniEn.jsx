@@ -316,7 +316,7 @@ if (loading) {
 
   return (
     <section className="section widget-slider py-4">
-      <div className="relative flex flex-col justify-start items-start group w-full max-w-[1428px] mx-auto px-4 sm:px-6 md:px-10 lg:px-[64px] h-auto rounded-md">
+      <div className="relative flex flex-col justify-start items-start w-full max-w-[1428px] mx-auto px-4 sm:px-6 md:px-10 lg:px-[64px] h-auto rounded-md">
         <div className="flex flex-row items-center justify-between w-full sm:w-[500px] h-auto">
           <div className="flex items-center gap-2 sm:gap-4 group-hover-trigger">
             <h2 className="text-lg sm:text-xl md:text-2xl lg:text-[30px] text-[#000000] font-medium transition-colors duration-200">
