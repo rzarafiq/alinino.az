@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
-import { FaRegStar, FaRegCommentDots, FaMinus, FaPlus, FaHeart, FaRegHeart, FaChevronLeft, FaChevronRight, FaChevronDown, FaWhatsapp } from "react-icons/fa";
+import { FaRegStar, FaRegCommentDots, FaMinus, FaPlus, FaHeart, FaRegHeart, FaChevronLeft, FaChevronRight, FaChevronDown, FaWhatsapp, FaChevronUp } from "react-icons/fa";
 import { BsCart3 } from "react-icons/bs";
 import { RiCloseFill} from "react-icons/ri";
 import { GoArrowLeft, GoArrowRight } from "react-icons/go";
@@ -11,19 +11,12 @@ import "swiper/css/navigation";
 import "swiper/css/pagination";
 import { Slider } from 'antd';
 import 'antd/dist/reset.css';
-import { getAllProducts, getAllCategories } from '../../services/index';
 import ReCAPTCHA from "react-google-recaptcha";
+import { getAllProducts, getAllCategories, fetchProductsByCategory } from '../../services/index';
+import { scrollTop } from "../../utility/scrollTop";
 import alinino_logo from "../../assets/img/alinino_logo.png";
 
 function Collection() {
-  const [hoveredProductId, setHoveredProductId] = useState(null);
-  const [likedProducts, setLikedProducts] = useState([]);
-  const [likedProductIds, setLikedProductIds] = useState({});
-  const [cartQuantities, setCartQuantities] = useState({});
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [selectedProduct, setSelectedProduct] = useState(null);
-  const [isFirstSlide, setIsFirstSlide] = useState(true);
-  const [isLastSlide, setIsLastSlide] = useState(false);
   const [loading, setLoading] = useState(true);
   const [products, setProducts] = useState([]);
   const [allProducts, setAllProducts] = useState([]);
@@ -31,9 +24,7 @@ function Collection() {
   const [navigationStack, setNavigationStack] = useState([{ type: "root", label: "Kataloq" }]);
   const [showOnlyAvailable, setShowOnlyAvailable] = useState(false);
   const [priceRange, setPriceRange] = useState([0, 100]);
-  const [sliderValues, setSliderValues] = useState([0, priceRange[1]]);
-  const modalRef = useRef(null);
-  const swiperRef = useRef(null);
+  const [sliderValues, setSliderValues] = useState([0, 100]);
   const [isThemeOpen, setIsThemeOpen] = useState(true);
   const [selectedThemes, setSelectedThemes] = useState(new Set());
   const [isGenreOpen, setIsGenreOpen] = useState(true);
@@ -48,12 +39,31 @@ function Collection() {
   const [selectedBrands, setSelectedBrands] = useState(new Set());
   const [isPageCountOpen, setIsPageCountOpen] = useState(true);
   const [selectedPageCounts, setSelectedPageCounts] = useState(new Set());
+  const [cartQuantities, setCartQuantities] = useState({});
+  const [likedProductIds, setLikedProductIds] = useState({});
+  const [hoveredProductId, setHoveredProductId] = useState(null);
+  const [isViewedBeginning, setIsViewedBeginning] = useState(true);
+  const [isViewedEnd, setIsViewedEnd] = useState(false);
+  const viewedSwiperRef = useRef(null);
+  const [selectedProduct, setSelectedProduct] = useState(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isFirstSlide, setIsFirstSlide] = useState(true);
+  const [isLastSlide, setIsLastSlide] = useState(false);
+  const swiperRef = useRef(null);
+  const modalRef = useRef(null);
   const [isFavoritesLimitOpen, setIsFavoritesLimitOpen] = useState(false);
+  const limitModalRef = useRef(null);
+  const [isDesktop, setIsDesktop] = useState(window.innerWidth >= 768);
   const [isPreorderOpen, setIsPreorderOpen] = useState(false);
   const [preorderProduct, setPreorderProduct] = useState(null);
-  const limitModalRef = useRef(null);
+  const preorderModalRef = useRef(null);
+  const [showScrollTop, setShowScrollTop] = useState(false);
+  const [showOrderForm, setShowOrderForm] = useState(false);
+  const [viewedProducts, setViewedProducts] = useState([]);
 
-  // Təhlükəsiz parse
+  const filteredViewedProducts = viewedProducts.filter(p => p !== null);
+
+  // Helper function to safely parse localStorage data
   const safeParse = (key, fallback = []) => {
     try {
       const item = localStorage.getItem(key);
@@ -64,18 +74,27 @@ function Collection() {
     }
   };
 
-  // Missing navigation handlers
-  const handleCategoryClick = (category) => {
-    const filtered = allProducts.filter(p => p.category_id === category.id);
-    setProducts(filtered);
-    setNavigationStack(prev => [...prev, { type: "main", label: category.category }]);
+  // Handle category click (main level)
+  const handleCategoryClick = async (category) => {
+    setLoading(true);
+    try {
+      const productsData = await fetchProductsByCategory(category.id);
+      const productsArray = Array.isArray(productsData) ? productsData : [];
+      setProducts(productsArray);
+      setNavigationStack(prev => [...prev, { type: "main", label: category.category, id: category.id }]);
+    } catch (err) {
+      console.error("Məhsullar yüklənərkən xəta:", err);
+      setProducts([]);
+    } finally {
+      setLoading(false);
+    }
   };
 
+  // Handle subcategory click (second level)
   const handleSubCategoryClick = (subcategory) => {
-    const mainCat = navigationStack[navigationStack.length - 1].label;
-    const cat = categories.find(c => c.category === mainCat);
-    const filtered = allProducts.filter(p => 
-      p.category_id === cat?.id && (
+    const mainCatId = navigationStack.find(item => item.type === "main")?.id;
+    const filtered = allProducts.filter(p =>
+      p.category_id === mainCatId && (
         p.category_hierarchy?.[1] === subcategory ||
         p.properties?.some(prop => prop.title === subcategory)
       )
@@ -84,6 +103,7 @@ function Collection() {
     setNavigationStack(prev => [...prev, { type: "sub", label: subcategory }]);
   };
 
+  // Handle sub-subcategory click (third level)
   const handleSubSubCategoryClick = (subSubcategory) => {
     const filtered = allProducts.filter(p =>
       p.category_hierarchy?.[2] === subSubcategory ||
@@ -93,38 +113,28 @@ function Collection() {
     setNavigationStack(prev => [...prev, { type: "subsub", label: subSubcategory }]);
   };
 
-  // Missing modal handlers
-  const closeLimitModal = () => {
-    setIsFavoritesLimitOpen(false);
-  };
-
-  const handleCloseForm = () => {
-    setIsPreorderOpen(false);
-    setPreorderProduct(null);
-  };
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    console.log("Form submitted");
-    handleCloseForm();
-  };
-
-  const handleRecaptchaChange = (value) => {
-    console.log("Captcha value:", value);
-  };
-
-  // Əsas məlumatları yüklə
+  // Initial data load
   useEffect(() => {
-    const loadProducts = async () => {
+    const loadProductsAndCategories = async () => {
       try {
-        const productsData = await getAllProducts();
-        const categoriesData = await getAllCategories();
-        const productsArray = Array.isArray(productsData) ? productsData : [];
+        const [productsData, categoriesData] = await Promise.all([
+          getAllProducts(),
+          getAllCategories()
+        ]);
+
+        let productsArray = [];
+        if (productsData && typeof productsData === 'object' && !Array.isArray(productsData)) {
+          productsArray = Object.values(productsData).flat();
+        } else if (Array.isArray(productsData)) {
+           productsArray = productsData;
+        }
+
         const categoriesArray = Array.isArray(categoriesData) ? categoriesData : [];
+
         setAllProducts(productsArray);
         setCategories(categoriesArray);
         setProducts(productsArray);
-        // Qiymət aralığını tap
+
         const prices = productsArray
           .map(p => parseFloat(p.variants?.[0]?.price || 0))
           .filter(p => !isNaN(p));
@@ -137,10 +147,11 @@ function Collection() {
         setLoading(false);
       }
     };
-    loadProducts();
+
+    loadProductsAndCategories();
   }, []);
 
-  // Səbət miqdarlarını yüklə
+  // Load cart quantities from localStorage on mount
   useEffect(() => {
     const cart = safeParse('cartProducts');
     const quantities = {};
@@ -152,11 +163,12 @@ function Collection() {
     setCartQuantities(quantities);
   }, []);
 
-  // Səbəti yenilə
+  // Generic function to update cart in localStorage and notify other components
   const updateCartAndNotify = (product, quantityChange) => {
     const cart = safeParse('cartProducts');
     const productIndex = cart.findIndex((item) => item.id === product.id);
     let newQuantity = 0;
+
     if (productIndex > -1) {
       newQuantity = cart[productIndex].quantity + quantityChange;
       if (newQuantity > 0) {
@@ -168,6 +180,7 @@ function Collection() {
       cart.push({ ...product, quantity: 1 });
       newQuantity = 1;
     }
+
     try {
       localStorage.setItem('cartProducts', JSON.stringify(cart));
       window.dispatchEvent(new Event('cartUpdated'));
@@ -177,7 +190,7 @@ function Collection() {
     return newQuantity;
   };
 
-  // Səbətə əlavə et
+  // Add one item to cart
   const addToCart = (product) => {
     const newQuantity = updateCartAndNotify(product, 1);
     if (newQuantity > 0) {
@@ -188,7 +201,7 @@ function Collection() {
     }
   };
 
-  // Miqdarı dəyiş
+  // Change item quantity in cart (positive or negative change)
   const handleQuantityChange = (product, change) => {
     const newQuantity = updateCartAndNotify(product, change);
     setCartQuantities((prev) => {
@@ -202,50 +215,8 @@ function Collection() {
     });
   };
 
-  // Modalda miqdarı dəyiş
-  const handleModalQuantityChange = (change) => {
-    if (!selectedProduct) return;
-    handleQuantityChange(selectedProduct, change);
-  };
 
-  // Sevimliləri yüklə
-  useEffect(() => {
-    const liked = safeParse('likedProducts');
-    setLikedProducts(liked);
-    const likedIds = {};
-    liked.forEach((p) => {
-      if (p?.id) likedIds[p.id] = true;
-    });
-    setLikedProductIds(likedIds);
-  }, []);
-
-  // Sevimlilərə əlavə/sil
-  const handleLikeToggle = (product) => {
-    const isLiked = likedProducts.some((p) => p.id === product.id);
-    const updated = isLiked
-      ? likedProducts.filter((p) => p.id !== product.id)
-      : [...likedProducts, product];
-    setLikedProducts(updated);
-    setLikedProductIds((prev) => ({
-      ...prev,
-      [product.id]: !isLiked,
-    }));
-    localStorage.setItem("likedProducts", JSON.stringify(updated));
-    window.dispatchEvent(new Event("likedProductsUpdated"));
-  };
-
-  // Modal aç
-  const openModal = (product) => {
-    setSelectedProduct(product);
-    setIsModalOpen(true);
-  };
-
-  const closeModal = () => {
-    setIsModalOpen(false);
-    setSelectedProduct(null);
-  };
-
-  // Xaricinə klik
+  // Handle click outside modal to close it
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (isModalOpen && modalRef.current && !modalRef.current.contains(event.target)) {
@@ -256,18 +227,7 @@ function Collection() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [isModalOpen]);
 
-  // Swiper naviqasiya
-  const onSwiperInit = (swiper) => {
-    swiperRef.current = swiper;
-    setIsFirstSlide(swiper.isBeginning);
-    setIsLastSlide(swiper.isEnd);
-  };
-
-  const onSlideChange = (swiper) => {
-    setIsFirstSlide(swiper.isBeginning);
-    setIsLastSlide(swiper.isEnd);
-  };
-
+  // Handle window resize
   const [windowWidth, setWindowWidth] = useState(window.innerWidth);
   useEffect(() => {
     const handleResize = () => setWindowWidth(window.innerWidth);
@@ -275,24 +235,64 @@ function Collection() {
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
-  const isDesktop = windowWidth >= 1024;
-
-  // Qiymət slayderi dəyişikliyi
+  // Update slider values when price range changes
   useEffect(() => {
     setSliderValues([0, priceRange[1]]);
   }, [priceRange]);
 
+  // Handle slider value change
   const handleSliderChange = (values) => {
     setSliderValues(values);
   };
 
+  // Handle slider change completion (e.g., after user stops dragging)
   const handleSliderChangeComplete = (values) => {
     console.log("Seçilmiş qiymət aralığı:", values);
   };
 
+  // Get subcategories for the current main category level
   const currentLevel = navigationStack[navigationStack.length - 1];
+  const getMainLevelSubcategories = () => {
+    if (currentLevel.type === "main") {
+      const mainCatId = navigationStack.find(item => item.type === "main")?.id;
+      const relevantProducts = allProducts.filter(p => p.category_id === mainCatId);
+      const subcats = [...new Set(
+        relevantProducts
+          .flatMap((p) => [
+            p.category_hierarchy?.[1],
+            p.characteristics?.find((c) => c.permalink === "label")?.title,
+          ])
+          .filter(Boolean)
+      )];
+      return subcats;
+    }
+    return [];
+  };
 
-  //  Bütün unikal "Mövzu" dəyərlərini çıxarın
+  // Get sub-subcategories for the current subcategory level
+  const getSubLevelSubcategories = () => {
+    if (currentLevel.type === "sub") {
+      const mainCatId = navigationStack.find(item => item.type === "main")?.id;
+      const subCatLabel = navigationStack.find(item => item.type === "sub")?.label;
+      const relevantProducts = allProducts.filter((p) =>
+        p.category_id === mainCatId && (
+          p.category_hierarchy?.[1] === subCatLabel ||
+          p.properties?.some((prop) => prop.title === subCatLabel)
+        )
+      );
+      const subsubcats = [...new Set(
+        relevantProducts
+          .flatMap((p) => [
+            p.category_hierarchy?.[2],
+          ])
+          .filter(Boolean)
+      )];
+      return subsubcats;
+    }
+    return [];
+  };
+
+  // Extract unique themes from products
   const allThemes = [...new Set(
     allProducts.flatMap((product) =>
       product.characteristics
@@ -302,7 +302,7 @@ function Collection() {
     ).filter(Boolean)
   )];
 
-  // Mövzu seçimi dəyişikliyi
+  // Handle theme filter change
   const handleThemeChange = (theme) => {
     setSelectedThemes((prev) => {
       const newSet = new Set(prev);
@@ -315,7 +315,7 @@ function Collection() {
     });
   };
 
-  // Bütün unikal "Janr" dəyərlərini çıxarın
+  // Extract unique genres from products
   const allGenres = [...new Set(
     allProducts.flatMap((product) =>
       product.characteristics
@@ -324,7 +324,7 @@ function Collection() {
     ).filter(Boolean)
   )];
 
-  // Janr seçimi dəyişikliyi
+  // Handle genre filter change
   const handleGenreChange = (genre) => {
     setSelectedGenres((prev) => {
       const newSet = new Set(prev);
@@ -337,7 +337,7 @@ function Collection() {
     });
   };
 
-  // Bütün unikal "Müəllif" dəyərlərini çıxarın
+  // Extract unique authors from products
   const allAuthors = [...new Set(
     allProducts.flatMap((product) =>
       product.characteristics
@@ -347,7 +347,7 @@ function Collection() {
     ).filter(Boolean)
   )];
 
-  // Müəllif seçimi dəyişikliyi
+  // Handle author filter change
   const handleAuthorChange = (author) => {
     setSelectedAuthors((prev) => {
       const newSet = new Set(prev);
@@ -360,7 +360,7 @@ function Collection() {
     });
   };
 
-  //  Bütün unikal "Dil" dəyərlərini çıxarın
+  // Extract unique languages from products
   const allLanguages = [...new Set(
     allProducts.flatMap((product) =>
       product.characteristics
@@ -370,7 +370,7 @@ function Collection() {
     ).filter(Boolean)
   )];
 
-  // Dil seçimi dəyişikliyi
+  // Handle language filter change
   const handleLanguageChange = (language) => {
     setSelectedLanguages((prev) => {
       const newSet = new Set(prev);
@@ -383,7 +383,7 @@ function Collection() {
     });
   };
 
-  // Bütün unikal "Seriya" dəyərlərini çıxarın
+  // Extract unique series from products
   const allSeries = [...new Set(
     allProducts.flatMap((product) =>
       product.characteristics
@@ -392,7 +392,7 @@ function Collection() {
     ).filter(Boolean)
   )];
 
-  // Seriya seçimi dəyişikliyi
+  // Handle series filter change
   const handleSeriesChange = (series) => {
     setSelectedSeries((prev) => {
       const newSet = new Set(prev);
@@ -405,7 +405,7 @@ function Collection() {
     });
   };
 
-  //  Bütün unikal "Nəşriyyat" (Brend) dəyərlərini çıxarın
+  // Extract unique brands from products
   const allBrands = [...new Set(
     allProducts.flatMap((product) =>
       product.characteristics
@@ -415,7 +415,7 @@ function Collection() {
     ).filter(Boolean)
   )];
 
-  // Brend seçimi dəyişikliyi
+  // Handle brand filter change
   const handleBrandChange = (brand) => {
     setSelectedBrands((prev) => {
       const newSet = new Set(prev);
@@ -428,7 +428,7 @@ function Collection() {
     });
   };
 
-  //  Bütün unikal "Səhifələrin sayı" dəyərlərini çıxarın
+  // Extract unique page counts from products and sort numerically
   const allPageCounts = [...new Set(
     allProducts.flatMap((product) =>
       product.characteristics
@@ -438,7 +438,7 @@ function Collection() {
     ).filter(Boolean)
   )].sort((a, b) => parseInt(a) - parseInt(b));
 
-  //  Səhifə sayı seçimi dəyişikliyi
+  // Handle page count filter change
   const handlePageCountChange = (count) => {
     setSelectedPageCounts((prev) => {
       const newSet = new Set(prev);
@@ -451,38 +451,186 @@ function Collection() {
     });
   };
 
-  // Bütün filtrələrə görə məhsulları filtrlə
+  // Apply all filters to the product list
   const filteredProducts = products.filter((product) => {
     const variant = product.variants?.[0];
     const price = parseFloat(variant?.price || 0);
-    // Mövcudluq
+
     const isInStock = !showOnlyAvailable || (product.available && variant && variant.quantity > 0);
-    // Qiymət aralığı
     const isInRange = price >= sliderValues[0] && price <= sliderValues[1];
-    // Janr
-    const genre = product.properties?.find((p) => p.permalink === "zhanr")?.title;
+
+    const genre = product.properties?.find((p) => p.permalink === "zhanr")?.title ||
+                   product.characteristics?.find((c) => c.property_id === 12019263)?.title;
     const matchesGenre = selectedGenres.size === 0 || selectedGenres.has(genre);
-    // Müəllif
-    const author = product.characteristics?.find((c) => c.property_id === 12057361)?.title;
+
+    const author = product.properties?.find((p) => p.permalink === "avtor")?.title ||
+                   product.characteristics?.find((c) => c.property_id === 12057361)?.title;
     const matchesAuthor = selectedAuthors.size === 0 || selectedAuthors.has(author);
-    // Dil
-    const language = product.characteristics?.find((c) => c.property_id === 29707988)?.title;
+
+    const language = product.properties?.find((p) => p.permalink === "yazik")?.title ||
+                     product.characteristics?.find((c) => c.property_id === 29707988)?.title;
     const matchesLanguage = selectedLanguages.size === 0 || selectedLanguages.has(language);
-    // Seriya
-    const series = product.characteristics?.find((c) => c.property_id === 35706589)?.title;
+
+    const series = product.properties?.find((p) => p.permalink === "seriya")?.title ||
+                   product.characteristics?.find((c) => c.property_id === 35706589)?.title;
     const matchesSeries = selectedSeries.size === 0 || selectedSeries.has(series);
-    // Brend
-    const brand = product.characteristics?.find((c) => c.property_id === 12019265)?.title;
+
+    const brand = product.properties?.find((p) => p.permalink === "izdatelstvo")?.title ||
+                  product.characteristics?.find((c) => c.property_id === 12019265)?.title;
     const matchesBrand = selectedBrands.size === 0 || selectedBrands.has(brand);
-    // Səhifə sayı
-    const pageCount = product.characteristics?.find((c) => c.property_id === 22372871)?.title;
+
+    const pageCount = product.properties?.find((p) => p.permalink === "kol_vo_stranic")?.title ||
+                      product.characteristics?.find((c) => c.property_id === 22372871)?.title;
     const matchesPageCount = selectedPageCounts.size === 0 || selectedPageCounts.has(pageCount);
-    // Mövzu
-    const theme = product.characteristics?.find((c) => c.property_id === 11912325)?.title;
+
+    const theme = product.properties?.find((p) => p.permalink === "tema")?.title ||
+                  product.characteristics?.find((c) => c.property_id === 11912325)?.title;
     const matchesTheme = selectedThemes.size === 0 || selectedThemes.has(theme);
+
     return isInStock && isInRange && matchesGenre && matchesAuthor && matchesLanguage && matchesSeries && matchesBrand && matchesPageCount && matchesTheme;
   });
 
+  // Load liked products from localStorage on mount
+  useEffect(() => {
+    const liked = safeParse("likedProducts", []);
+    const likedMap = {};
+    liked.forEach((p) => (likedMap[p.id] = true));
+    setLikedProductIds(likedMap);
+  }, []);
+
+  // Load viewed products from localStorage on mount
+  useEffect(() => {
+    const viewed = safeParse('viewedProducts', []);
+    setViewedProducts(viewed);
+  }, []);
+
+  // Handle slide change for viewed products swiper
+  const handleViewedSlideChange = (swiper) => {
+    setIsViewedBeginning(swiper.isBeginning);
+    setIsViewedEnd(swiper.isEnd);
+  };
+
+  // Close the favorites limit modal
+  const closeLimitModal = () => {
+    setIsFavoritesLimitOpen(false);
+  };
+
+  // Open the quick view modal
+  const openModal = (product) => {
+    setSelectedProduct(product);
+    setIsModalOpen(true);
+  };
+
+  // Close the quick view modal
+  const closeModal = () => {
+    setIsModalOpen(false);
+    setSelectedProduct(null);
+  };
+
+  // Handle swiper initialization for quick view modal
+  const onSwiperInit = (swiper) => {
+    swiperRef.current = swiper;
+    setIsFirstSlide(swiper.isBeginning);
+    setIsLastSlide(swiper.isEnd);
+  };
+
+  // Handle slide change for quick view modal swiper
+  const onSlideChange = (swiper) => {
+    setIsFirstSlide(swiper.isBeginning);
+    setIsLastSlide(swiper.isEnd);
+  };
+
+  // Handle quantity change within the quick view modal
+  const handleModalQuantityChangeInModal = (delta) => {
+    if (!selectedProduct) return;
+    const productId = selectedProduct.id;
+    const variant = selectedProduct.variants?.[0];
+    if (!variant || !selectedProduct.available || variant.quantity <= 0) return;
+
+    const currentQty = cartQuantities[productId] || 0;
+    const newQty = Math.max(0, currentQty + delta);
+
+    if (newQty === 0) {
+      handleRemoveFromCart(productId);
+      updateCartAndNotify(selectedProduct, -currentQty);
+      return;
+    }
+
+    // Update quantities in state and localStorage via updateCartAndNotify
+    const cart = safeParse('cartProducts');
+    const productIndex = cart.findIndex((item) => item.id === productId);
+    if (productIndex > -1) {
+        cart[productIndex].quantity = newQty;
+    } else {
+        cart.push({ ...selectedProduct, quantity: newQty });
+    }
+    localStorage.setItem("cartProducts", JSON.stringify(cart));
+    setCartQuantities(prev => ({ ...prev, [productId]: newQty }));
+    window.dispatchEvent(new Event("cartUpdated"));
+  };
+
+  // Ön sifariş modallarını idarə edən funksiyalar
+  const handleOpenPreorder = (product) => {
+    setPreorderProduct(product);
+    setIsPreorderOpen(true);
+  };
+
+  const handleCloseForm = () => {
+    setIsPreorderOpen(false);
+    setPreorderProduct(null);
+  };
+
+  const handleRecaptchaChange = (token) => {
+    console.log("reCAPTCHA token:", token);
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    alert("Müraciətiniz uğurla göndərildi. Ən qısa zamanda sizinlə əlaqə saxlayacağıq.");
+    handleCloseForm();
+  };
+
+  // Sevimliyə əlavə/sil
+  const handleLikeToggle = (product) => {
+    const updated = { ...likedProductIds };
+    let updatedList = safeParse("likedProducts", []);
+
+    if (updated[product.id]) {
+      delete updated[product.id];
+      updatedList = updatedList.filter((p) => p.id !== product.id);
+    } else {
+      if (updatedList.length >= 20) {
+        setIsFavoritesLimitOpen(true);
+        return;
+      }
+      updated[product.id] = true;
+      updatedList.push(product);
+    }
+
+    localStorage.setItem("likedProducts", JSON.stringify(updatedList));
+    setLikedProductIds(updated);
+    window.dispatchEvent(new Event("likedProductsUpdated"));
+  };
+
+  // Scroll pozisiyasını yoxlamaq üçün effect
+  useEffect(() => {
+    const handleScroll = () => {
+      if (window.scrollY > 300) {
+        setShowScrollTop(true);
+      } else {
+        setShowScrollTop(false);
+      }
+    };
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  // Scroll top funksiyası
+  const scrollToTop = () => {
+    scrollTop(0, true);
+  };
+
+  // Yükləmə vəziyyəti
   if (loading) {
     return (
       <div className="fixed inset-0 flex items-center justify-center bg-white z-50">
@@ -507,16 +655,27 @@ function Collection() {
           ))}
         </ol>
       </div>
+      <style jsx>{`
+        .hide-scrollbar {
+          -ms-overflow-style: none;  /* IE ve Edge */
+          scrollbar-width: none;  /* Firefox */
+        }
+        .hide-scrollbar::-webkit-scrollbar {
+          display: none; /* Chrome, Safari, Opera*/
+        }
+      `}</style>
+
       {/* Başlıq */}
       <div className="flex flex-row items-center gap-2 max-w-[1428px] mx-auto h-full px-10 lg:px-[64px] mt-5">
         <h2 className="text-[30px]">Kataloq</h2>
         <span className="text-[20px] font-normal text-[#999999]">{filteredProducts.length} məhsul</span>
       </div>
-      {/* Məhsul siyahısı */}
+
+      {/* Məhsullar */}
       <div className="flex flex-row items-start justify-between gap-6 max-w-[1428px] mx-auto h-full px-10 mt-6 lg:px-[64px] overflow-y-auto">
-        {/* Sol: İyerarxik Menyu və Filtreler */}
+       
+        {/* Filtrlər */}
         <div className="w-[300px] flex-shrink-0">
-          {/* Breadcrumb (Yuxarıda iyerarxiya) */}
           <div className="flex flex-col justify-center text-[16px] text-[#000000] font-medium">
             {navigationStack.map((item, index) => (
               <button
@@ -532,9 +691,17 @@ function Collection() {
                     if (index === 0) {
                       setProducts(allProducts);
                     } else if (index === 1) {
-                      const mainCat = navigationStack[1].label;
-                      const cat = categories.find((c) => c.category === mainCat);
-                      setProducts(allProducts.filter((p) => p.category_id === cat?.id));
+                      const mainCatId = navigationStack[1].id;
+                      if (mainCatId) {
+                        handleCategoryClick({ id: mainCatId, category: navigationStack[1].label });
+                      } else {
+                         const cat = categories.find((c) => c.category === navigationStack[1].label);
+                         if (cat) {
+                            handleCategoryClick(cat);
+                         } else {
+                            setProducts(allProducts);
+                         }
+                      }
                     } else if (index === 2) {
                       const subCat = navigationStack[2].label;
                       setProducts(
@@ -565,7 +732,6 @@ function Collection() {
               </button>
             ))}
           </div>
-          {/* Sol menyu: Cari səviyyənin alt kateqoriyaları */}
           <ul className="text-[16px] text-[#000000] mx-4 mt-1">
             {currentLevel.type === "root" && (
               <>
@@ -581,18 +747,8 @@ function Collection() {
                 ))}
               </>
             )}
-            {currentLevel.type === "main" && (() => {
-              const subcats = [...new Set(
-                allProducts
-                  .filter((p) => p.category_id === categories.find(c => c.category === currentLevel.label)?.id)
-                  .flatMap((p) => [
-                    p.properties?.find((prop) => prop.permalink === "zhanr")?.title,
-                    p.properties?.find((prop) => prop.permalink === "yazik")?.title,
-                    p.characteristics?.find((c) => c.permalink === "label")?.title,
-                  ])
-                  .filter(Boolean)
-              )];
-              return subcats.map((subcat) => (
+            {currentLevel.type === "main" && (
+              getMainLevelSubcategories().map((subcat) => (
                 <li key={subcat}>
                   <button
                     onClick={() => handleSubCategoryClick(subcat)}
@@ -601,22 +757,10 @@ function Collection() {
                     {subcat}
                   </button>
                 </li>
-              ));
-            })()}
-            {currentLevel.type === "sub" && (() => {
-              const subsubcats = [...new Set(
-                allProducts
-                  .filter((p) =>
-                    p.category_hierarchy?.[1] === currentLevel.label ||
-                    p.properties?.some((prop) => prop.title === currentLevel.label)
-                  )
-                  .flatMap((p) => [
-                    p.properties?.find((prop) => prop.permalink === "avtor")?.title,
-                    p.properties?.find((prop) => prop.permalink === "izdatelstvo")?.title,
-                  ])
-                  .filter(Boolean)
-              )];
-              return subsubcats.map((subsub) => (
+              ))
+            )}
+            {currentLevel.type === "sub" && (
+              getSubLevelSubcategories().map((subsub) => (
                 <li key={subsub}>
                   <button
                     onClick={() => handleSubSubCategoryClick(subsub)}
@@ -625,10 +769,9 @@ function Collection() {
                     {subsub}
                   </button>
                 </li>
-              ));
-            })()}
+              ))
+            )}
           </ul>
-          {/* Mövcud olan məhsullar filtri */}
           <div className="flex flex-row items-center gap-2 mt-4 mx-4 px-4">
             <span className="text-[16px] text-[#000000] font-bold">Mövcud olan məhsullar</span>
             <label htmlFor="availableFilter" className="inline-flex items-center cursor-pointer text-[#005bff]">
@@ -645,7 +788,6 @@ function Collection() {
               </span>
             </label>
           </div>
-          {/* Qiymət filtri */}
           <div className="mx-4 mt-4 px-4">
             <span className="text-[16px] text-[#000000] font-bold">Qiymət, AZN</span>
             <div className="flex flex-row items-center gap-4 my-4">
@@ -670,7 +812,6 @@ function Collection() {
               trackStyle={[{ backgroundColor: "#005bff", height: 4 }]}
             />
           </div>
-          {/* Mövzu filtri */}
           <div className="flex flex-row items-center justify-between bg-[#f7f8fa] mx-4 mt-4 px-4 py-2 rounded-md cursor-pointer" onClick={() => setIsThemeOpen(!isThemeOpen)}>
             <span className="text-[16px] text-[#000000] font-bold">Mövzu</span>
             {isThemeOpen ? (
@@ -698,7 +839,6 @@ function Collection() {
               )}
             </div>
           )}
-          {/* Janr filtri */}
           <div className="flex flex-row items-center justify-between bg-[#f7f8fa] mx-4 mt-4 px-4 py-2 rounded-md cursor-pointer" onClick={() => setIsGenreOpen(!isGenreOpen)}>
             <span className="text-[16px] text-[#000000] font-bold">Janr</span>
             {isGenreOpen ? <FaChevronDown /> : <FaChevronRight />}
@@ -722,7 +862,6 @@ function Collection() {
               )}
             </div>
           )}
-          {/* Müəllif filtri */}
           <div className="flex flex-row items-center justify-between bg-[#f7f8fa] mx-4 mt-4 px-4 py-2 rounded-md cursor-pointer" onClick={() => setIsAuthorOpen(!isAuthorOpen)}>
             <span className="text-[16px] text-[#000000] font-bold">Müəllif</span>
             {isAuthorOpen ? <FaChevronDown /> : <FaChevronRight />}
@@ -746,7 +885,6 @@ function Collection() {
               )}
             </div>
           )}
-          {/* Dil filtri */}
           <div className="flex flex-row items-center justify-between bg-[#f7f8fa] mx-4 mt-4 px-4 py-2 rounded-md cursor-pointer" onClick={() => setIsLanguageOpen(!isLanguageOpen)}>
             <span className="text-[16px] text-[#000000] font-bold">Dil</span>
             {isLanguageOpen ? <FaChevronDown /> : <FaChevronRight />}
@@ -770,7 +908,6 @@ function Collection() {
               )}
             </div>
           )}
-          {/* Seriya filtri */}
           <div className="flex flex-row items-center justify-between bg-[#f7f8fa] mx-4 mt-4 px-4 py-2 rounded-md cursor-pointer" onClick={() => setIsSeriesOpen(!isSeriesOpen)}>
             <span className="text-[16px] text-[#000000] font-bold">Seriya</span>
             {isSeriesOpen ? <FaChevronDown /> : <FaChevronRight />}
@@ -794,7 +931,6 @@ function Collection() {
               )}
             </div>
           )}
-          {/* Brend filtri */}
           <div className="flex flex-row items-center justify-between bg-[#f7f8fa] mx-4 mt-4 px-4 py-2 rounded-md cursor-pointer" onClick={() => setIsBrandOpen(!isBrandOpen)}>
             <span className="text-[16px] text-[#000000] font-bold">Brend</span>
             {isBrandOpen ? <FaChevronDown /> : <FaChevronRight />}
@@ -818,7 +954,6 @@ function Collection() {
               )}
             </div>
           )}
-          {/* Səhifələrin sayı filtri */}
           <div className="flex flex-row items-center justify-between bg-[#f7f8fa] mx-4 mt-4 px-4 py-2 rounded-md cursor-pointer" onClick={() => setIsPageCountOpen(!isPageCountOpen)}>
             <span className="text-[16px] text-[#000000] font-bold">Səhifələrin sayı</span>
             {isPageCountOpen ? <FaChevronDown /> : <FaChevronRight />}
@@ -843,7 +978,8 @@ function Collection() {
             </div>
           )}
         </div>
-        {/* Sağ: Məhsul siyahısı */}
+
+        {/* Məhsul Tablosu */}
         <div className="flex-1">
           {filteredProducts.length === 0 ? (
             <div className="flex flex-col items-center justify-center mt-20">
@@ -867,7 +1003,8 @@ function Collection() {
                 const hasExpress = product.characteristics?.some((c) => c.permalink === "ekspress");
                 const hasComingSoon = product.characteristics?.some((c) => c.title === "TEZLİKLƏ!");
                 const hasFreeDelivery = product.characteristics?.some((c) => c.permalink === "PULSUZ ÇATDIRILMA");
-                const hasBestseller = product.characteristics?.some((c) => c.permalink.toLowerCase() === "bestseller");
+                const hasBestseller = product.characteristics?.some((c) => c.permalink?.toLowerCase() === "bestseller");
+
                 return (
                   <article
                     key={product.id}
@@ -877,7 +1014,6 @@ function Collection() {
                     onMouseEnter={() => setHoveredProductId(product.id)}
                     onMouseLeave={() => setHoveredProductId(null)}
                   >
-                    {/* Etiketlər */}
                     <div className="absolute top-3 left-3 flex flex-col items-start gap-1 p-2 z-30">
                       {hasDiscount && (
                         <div className="bg-[#f8353e] text-[#ffffff] text-[12px] font-semibold px-2 py-1 rounded-md shadow-md">
@@ -910,7 +1046,6 @@ function Collection() {
                         </div>
                       )}
                     </div>
-                    {/* Sevimlilər ikonu */}
                     <div className="absolute top-3 right-3 p-2 z-30">
                       {likedProductIds[product.id] ? (
                         <FaHeart
@@ -924,7 +1059,6 @@ function Collection() {
                         />
                       )}
                     </div>
-                    {/* Şəkil */}
                     <Link to={`/products/${product.permalink}`} className="block">
                       <div className="w-full h-[220px] flex items-center justify-center bg-[#ffffff] overflow-hidden relative group">
                         <img
@@ -953,7 +1087,6 @@ function Collection() {
                         </button>
                       </div>
                     </Link>
-                    {/* Məzmun */}
                     <div className="flex flex-col flex-1 p-2 justify-between">
                       <div>
                         <div className="flex flex-row items-center justify-start gap-3">
@@ -1007,7 +1140,13 @@ function Collection() {
                                   : "opacity-0 pointer-events-none"
                                 : "opacity-100 pointer-events-auto"
                             } ${isOutOfStock ? "bg-[#1a6bff] cursor-not-allowed" : "bg-[#f50809]"}`}
-                            onClick={() => !isOutOfStock && addToCart(product)}
+                            onClick={() => {
+                                if (isOutOfStock) {
+                                    handleOpenPreorder(product);
+                                } else {
+                                    addToCart(product);
+                                }
+                            }}
                           >
                             {!isOutOfStock && <BsCart3 className="text-[16px] font-black text-white sm:text-[20px]" />}
                             <span className="text-[16px] text-[#ffffff] font-medium">
@@ -1024,10 +1163,117 @@ function Collection() {
           )}
         </div>
       </div>
+
+      {/* Baxdığınız Məhsullar */}
+      {!showOrderForm && filteredViewedProducts.length > 0 && (
+        <div className="w-full md:my-5">
+          <div className="flex flex-col max-w-[1428px] mx-auto px-4 lg:px-16">
+            <div className="flex flex-row items-center gap-6">
+              <h2 className="text-[24px] sm:text-[28px] md:text-[32px] text-[#000000] font-normal">
+                Baxdığınız
+              </h2>
+              <button
+                onClick={() => {
+                  localStorage.removeItem("viewedProducts");
+                  setViewedProducts([]);
+                }}
+                className="text-[14px] text-[#000000] font-normal bg-[#eeeeee] hover:bg-[#dddddd] px-2 py-1 rounded-md cursor-pointer transition-colors duration-300"
+              >
+                Təmizlə
+              </button>
+            </div>
+            <div className="relative group w-full max-w-[1428px] mx-auto px-2 sm:px-4 lg:px-[4px] mt-4">
+              <Swiper
+                onSwiper={(swiper) => {
+                  viewedSwiperRef.current = swiper;
+                  setIsViewedBeginning(swiper.isBeginning);
+                }}
+                onSlideChange={handleViewedSlideChange}
+                modules={[Navigation]}
+                loop={false}
+                navigation={{
+                  nextEl: ".viewed-swiper-button-next-custom",
+                  prevEl: ".viewed-swiper-button-prev-custom",
+                }}
+                className="myViewedSwiper"
+                breakpoints={{
+                  0: { slidesPerView: 2, spaceBetween: 10 },
+                  640: { slidesPerView: 3, spaceBetween: 15 },
+                  768: { slidesPerView: 4, spaceBetween: 20 },
+                  1024: { slidesPerView: 4, spaceBetween: 25 },
+                  1280: { slidesPerView: 7, spaceBetween: 30 },
+                }}
+              >
+                {filteredViewedProducts.map((prod) => {
+                  const variant = prod.variants?.[0] || {};
+                  const secondImage = prod.images?.find(
+                    (img) => img.position === 2
+                  )?.original_url;
+                  return (
+                    <SwiperSlide key={`viewed-${prod.id}`}>
+                      <article
+                        className="flex flex-col h-full bg-white rounded overflow-hidden cursor-pointer"
+                        onMouseEnter={() => setHoveredProductId(prod.id)}
+                        onMouseLeave={() => setHoveredProductId(null)}
+                      >
+                        <Link to={`/products/${prod.permalink}`} rel="noopener noreferrer">
+                          <div className="w-full h-[140px] sm:h-[180px] md:h-[220px] lg:h-[260px] flex items-center justify-center bg-white overflow-hidden">
+                            <img
+                              src={
+                                hoveredProductId === prod.id && secondImage
+                                  ? secondImage
+                                  : prod.first_image?.original_url ||
+                                    prod.images?.[0]?.original_url
+                              }
+                              alt={prod.title}
+                              className="w-full h-full object-contain transition-all duration-300"
+                            />
+                          </div>
+                        </Link>
+                        <div className="flex flex-col flex-1 p-2">
+                          <div className="text-[14px] md:text-[16px] font-semibold text-black">
+                            {Number(variant.price || 0).toFixed(2)} AZN
+                          </div>
+                          <h3 className="text-[12px] md:text-[14px] text-black hover:text-[#f50809] leading-snug line-clamp-2">
+                            {prod.title || "Məhsul adı"}
+                          </h3>
+                        </div>
+                      </article>
+                    </SwiperSlide>
+                  );
+                })}
+              </Swiper>
+              {/* Prev button */}
+              <button
+                onClick={() => viewedSwiperRef.current?.slidePrev()}
+                className={`viewed-swiper-button-prev-custom absolute top-1/2 -left-3 sm:-left-4 md:-left-5 lg:-left-6 -translate-y-1/2 z-20 p-2 bg-white rounded-full shadow-lg ${
+                  isViewedBeginning ? "opacity-0 -translate-x-4" : "opacity-100"
+                } hidden sm:flex`}
+              >
+                <GoArrowLeft className="text-lg" />
+              </button>
+              {/* Next button */}
+              <button
+                onClick={() => viewedSwiperRef.current?.slideNext()}
+                className={`viewed-swiper-button-next-custom absolute top-1/2 -right-3 sm:-right-4 md:-right-5 lg:-right-6 -translate-y-1/2 z-20 p-2 bg-white rounded-full shadow-lg ${
+                  isViewedEnd ? "opacity-0 translate-x-4" : "opacity-100"
+                } hidden sm:flex`}
+              >
+                <GoArrowRight className="text-lg" />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Sürətli Görünüş Modalı */}
       {isModalOpen && selectedProduct && (
-        <div className="fixed inset-0 bg-[#0a0a0a98] flex items-center justify-center z-50 cursor-pointer">
-          <div ref={modalRef} className="flex flex-col md:flex-row w-[95%] md:w-[982px] h-auto md:h-[530px] p-4 md:p-8 rounded-lg overflow-hidden bg-[#ffffff] relative">
+        <div className="fixed inset-0 bg-[#0a0a0a98] flex items-center justify-center z-50 cursor-pointer" onClick={closeModal}>
+          <div
+            ref={modalRef}
+            className="flex flex-col md:flex-row w-[95%] md:w-[982px] h-auto md:h-[530px] p-4 md:p-8 rounded-lg overflow-hidden bg-[#ffffff] relative"
+            onClick={(e) => e.stopPropagation()}
+          >
             <button onClick={closeModal} className="absolute top-4 right-4 text-[#000000] z-50 cursor-pointer">
               <RiCloseFill className="text-[24px]" />
             </button>
@@ -1037,7 +1283,7 @@ function Collection() {
                   modules={[Navigation, Pagination]}
                   spaceBetween={0}
                   slidesPerView={1}
-                  loop={selectedProduct.images.length > 1}
+                  loop={selectedProduct.images?.length > 1}
                   onSwiper={onSwiperInit}
                   onSlideChange={onSlideChange}
                   pagination={{
@@ -1049,17 +1295,27 @@ function Collection() {
                   }}
                   className="h-[400px] w-full"
                 >
-                  {selectedProduct.images.map((image) => (
-                    <SwiperSlide key={image.id}>
-                      <Link to={`/products/${selectedProduct.permalink}`} rel="noopener noreferrer">
-                        <img
-                          src={image.original_url}
-                          alt={selectedProduct.title}
-                          className="w-full h-full object-contain object-center rounded-md cursor-pointer"
-                        />
-                      </Link>
+                  {selectedProduct.images?.length > 0 ? (
+                    selectedProduct.images.map((image) => (
+                      <SwiperSlide key={image.id}>
+                        <Link to={`/products/${selectedProduct.permalink}`} rel="noopener noreferrer">
+                          <img
+                            src={image.original_url}
+                            alt={selectedProduct.title}
+                            className="w-full h-full object-contain object-center rounded-md cursor-pointer"
+                          />
+                        </Link>
+                      </SwiperSlide>
+                    ))
+                  ) : (
+                    <SwiperSlide>
+                      <img
+                        src="/no-image.png"
+                        alt="Şəkil yoxdur"
+                        className="w-full h-full object-contain object-center rounded-md"
+                      />
                     </SwiperSlide>
-                  ))}
+                  )}
                 </Swiper>
                 <button
                   onClick={() => swiperRef.current?.slidePrev()}
@@ -1101,7 +1357,6 @@ function Collection() {
               `}</style>
             </div>
             <div className="w-full md:w-[55%] flex flex-col flex-1 justify-start">
-              {/* Etiketlər */}
               <div className="flex flex-row items-center gap-2 mt-2 sm:mt-0">
                 {(() => {
                   const variant = selectedProduct.variants?.[0];
@@ -1111,11 +1366,11 @@ function Collection() {
                   const discountPercent = hasDiscount
                     ? Math.round(((oldPrice - newPrice) / oldPrice) * 100)
                     : 0;
-                  const isOutOfStock = !variant || !selectedProduct.available || variant.quantity <= 0;
+                  const isOutOfStock = !variant || !selectedProduct.available || (variant.quantity || 0) <= 0;
                   const hasExpress = selectedProduct.characteristics?.some((c) => c.permalink === "ekspress");
                   const hasComingSoon = selectedProduct.characteristics?.some((c) => c.title === "TEZLİKLƏ!");
                   const hasFreeDelivery = selectedProduct.characteristics?.some((c) => c.permalink === "PULSUZ ÇATDIRILMA");
-                  const hasBestseller = selectedProduct.characteristics?.some((c) => c.permalink.toLowerCase() === "bestseller");
+                  const hasBestseller = selectedProduct.characteristics?.some((c) => c.permalink?.toLowerCase() === "bestseller");
                   return (
                     <>
                       {hasDiscount && (
@@ -1171,19 +1426,19 @@ function Collection() {
               </div>
               <div className="flex flex-row items-center gap-3 mt-2">
                 <div className="text-[26px] font-semibold text-gray-900">
-                  {selectedProduct.variants?.[0]?.price} AZN
+                  {Number(selectedProduct.variants?.[0]?.price || 0).toFixed(2)} AZN
                 </div>
                 {selectedProduct.variants?.[0]?.old_price &&
                   selectedProduct.variants[0].old_price !== selectedProduct.variants[0].price && (
                     <div className="text-[26px] line-through text-gray-500">
-                      {selectedProduct.variants[0].old_price} AZN
+                      {Number(selectedProduct.variants[0].old_price || 0).toFixed(2)} AZN
                     </div>
                   )}
               </div>
               {selectedProduct.variants?.[0]?.old_price &&
                 selectedProduct.variants[0].old_price > selectedProduct.variants[0].price && (
                   <div className="text-[#f50809] text-[14px] font-semibold mt-2">
-                    Qənaət: {(selectedProduct.variants[0].old_price - selectedProduct.variants[0].price).toFixed(2)} AZN
+                    Qənaət: {Number(selectedProduct.variants[0].old_price - selectedProduct.variants[0].price).toFixed(2)} AZN
                   </div>
                 )}
               <div className="flex items-center gap-2 mt-2">
@@ -1223,7 +1478,7 @@ function Collection() {
                         onClick={(e) => {
                           e.preventDefault();
                           e.stopPropagation();
-                          handleModalQuantityChange(-1);
+                          handleModalQuantityChangeInModal(-1);
                         }}
                         className="h-[55px] w-[55px] text-[#ffffff] bg-[#f50809] p-4 rounded-l-md"
                       >
@@ -1244,7 +1499,7 @@ function Collection() {
                         onClick={(e) => {
                           e.preventDefault();
                           e.stopPropagation();
-                          handleModalQuantityChange(1);
+                          handleModalQuantityChangeInModal(1);
                         }}
                         className="h-[55px] w-[55px] text-[#ffffff] bg-[#f50809] p-4 rounded-r-md"
                       >
@@ -1261,7 +1516,9 @@ function Collection() {
                       onClick={(e) => {
                         e.preventDefault();
                         e.stopPropagation();
-                        if (selectedProduct.variants?.[0]?.quantity > 0 && selectedProduct.available) {
+                        if (selectedProduct.variants?.[0]?.quantity === 0 || !selectedProduct.available) {
+                          handleOpenPreorder(selectedProduct); // Use the handler
+                        } else {
                           addToCart(selectedProduct);
                         }
                       }}
@@ -1311,9 +1568,10 @@ function Collection() {
           </div>
         </div>
       )}
+
       {/* Sevimlilər Limit Modalı */}
       {isFavoritesLimitOpen && (
-        <div className="fixed inset-0 bg-[#0a0a0a98] flex items-center justify-center z-50 cursor-pointer">
+        <div className="fixed inset-0 bg-[#0a0a0a98] flex items-center justify-center z-50 cursor-pointer" onClick={closeLimitModal}>
           <div
             ref={limitModalRef}
             className="bg-white w-[400px] h-[184px] py-4 px-6 rounded-lg shadow-lg max-w-md relative"
@@ -1329,21 +1587,21 @@ function Collection() {
             <p className="text-[16px] text-[#000000] mb-6">
               Sevimlilər siyahınıza 20-dən az məhsul əlavə edə bilərsiniz
             </p>
-            <Link to={'/Favorites'}
-              className="bg-[#f50809] text-white px-6 py-3 rounded-md hover:bg-[#e00708] transition"
-            >
+            <Link to={'/Favorites'} className="bg-[#f50809] text-white px-6 py-3 rounded-md hover:bg-[#e00708] transition">
               Sevimlilərə keçin
             </Link>
           </div>
         </div>
       )}
+
       {/* Ön sifariş Modalı */}
-      {isPreorderOpen && (
+      {isPreorderOpen && preorderProduct && (
         <div
           className="w-full h-screen fixed top-0 left-0 flex items-center justify-center bg-[#0a0a0a98] z-[100]"
           onClick={handleCloseForm}
         >
           <div
+            ref={preorderModalRef}
             className="bg-white w-[440px] h-auto max-h-[90vh] overflow-hidden py-4 px-6 rounded-md relative flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
@@ -1361,7 +1619,7 @@ function Collection() {
               `}</style>
               <div className='flex flex-col mb-5'>
                 <p className="text-[16px] text-black font-medium">
-                Ön sifariş – kitabların anbarda olmadığı halda sifariş vermək imkanıdır. Bizim operator tezliklə sizinlə əlaqə saxlayacaq və iki seçim təklif edəcək:
+                  Ön sifariş – kitabların anbarda olmadığı halda sifariş vermək imkanıdır. Bizim operator tezliklə sizinlə əlaqə saxlayacaq və iki seçim təklif edəcək:
                 </p>
                 <p className="text-[16px] text-black font-medium">
                   1. Ola bilər ki, kitab artıq yoldadır və tezliklə mağaza qiyməti ilə anbarda olacaq. Biz sizin əlaqə məlumatlarınızı əldə edəcək və kitab anbarda olarkən sizə xəbər verəcəyik.
@@ -1380,7 +1638,7 @@ function Collection() {
                 <input name="feedback[subject]" type="hidden" defaultValue="Ön sifariş" />
                 <input name="feedback[content]" type="hidden" defaultValue="Ön sifariş" />
                 <input name="feedback[from]" type="hidden" defaultValue="info@alinino.az" />
-                <a 
+                <a
                   href={`https://api.whatsapp.com/send/?phone=994513122440&text=${encodeURIComponent(`Salam. Öncədən sifariş etmək istəyirəm «${preorderProduct?.title || ''}» ${preorderProduct ? `https://alinino.az/product/${preorderProduct.permalink}` : 'https://alinino.az/'}`)}`}
                   target="_blank"
                   rel="noopener noreferrer"
@@ -1420,9 +1678,7 @@ function Collection() {
                   />
                 </div>
                 <div className="flex flex-col">
-                  <label className="mb-1">
-                    Rəylər
-                  </label>
+                  <label className="mb-1">Rəylər</label>
                   <textarea name="feedback[message]" className='h-[100px] border border-[#dddddd] outline-none rounded px-3 py-2'></textarea>
                 </div>
                 <div className="flex justify-center">
@@ -1437,23 +1693,76 @@ function Collection() {
                 >
                   Müraciət edin
                 </button>
-                <input
-                  type="hidden"
-                  defaultValue=""
-                  className="js-feedback-fields js-feedback-fields-cart"
-                  data-title="Səbətin tərkibi"
-                />
-                <input
-                  type="hidden"
-                  defaultValue="https://alinino.az/"
-                  className="js-feedback-fields js-feedback-fields-url"
-                  data-title="Səhifədən göndərilib"
-                />
+                <input type="hidden" defaultValue="" className="js-feedback-fields js-feedback-fields-cart" data-title="Səbətin tərkibi" />
+                <input type="hidden" defaultValue="https://alinino.az/" className="js-feedback-fields js-feedback-fields-url" data-title="Səhifədən göndərilib" />
               </form>
             </div>
           </div>
         </div>
       )}
+
+      {/* Scroll Top Düyməsi */}
+      {showScrollTop && (
+        <div className="fixed bottom-8 right-8 z-50">
+          <button
+            onClick={scrollToTop}
+            className="relative w-12 h-12 bg-[#005bff] text-white rounded-full shadow-lg transition-all duration-300 flex items-center justify-center scroll-top-button z-10"
+            aria-label="Yuxarı qalx"
+          >
+            <FaChevronUp className="text-[22px] hover-arrow" />
+          </button>
+        </div>
+      )}
+      <style jsx>{`
+        @keyframes sound-wave {
+          0% {
+            transform: translate(-50%, -50%) scale(1);
+            box-shadow: 0 0 0 0 rgba(0, 122, 255, 0.7);
+          }
+          100% {
+            transform: translate(-50%, -50%) scale(1);
+            box-shadow: 0 0 0 20px rgba(0, 122, 255, 0);
+          }
+        }
+        @keyframes arrow-popup {
+          0% {
+            transform: translateY(0);
+            opacity: 1;
+          }
+          15% {
+            transform: translateY(-30px);
+            opacity: 0;
+          }
+          30% {
+            transform: translateY(30px);
+            opacity: 0;
+          }
+          45% {
+            transform: translateY(0);
+            opacity: 1;
+          }
+          100% {
+            transform: translateY(0);
+            opacity: 1;
+          }
+        }
+        .scroll-top-button:hover::before {
+          content: '';
+          position: absolute;
+          top: 50%;
+          left: 50%;
+          width: 100%;
+          height: 100%;
+          border-radius: 50%;
+          animation: sound-wave 1s ease-out 1;
+        }
+        .hover-arrow {
+          /* Animasiya başlanğıcda olmur */
+        }
+        .scroll-top-button:hover .hover-arrow {
+          animation: arrow-popup 2s ease-in-out infinite;
+        }
+      `}</style>
     </>
   );
 }

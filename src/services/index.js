@@ -1,21 +1,33 @@
-import instance from "./instance";
+import api from './instance';
 
-export async function getAllCategories() {
+export const getAllCategories = async () => {
   try {
-    const res = await instance.get("/categories");
-    return res.data;
+    const response = await api.get('/categories');
+    return response.data;
   } catch (error) {
-    console.error("Kategoriya alınarkən xəta:", error);
-    return [];
+    console.error('Error fetching categories:', error);
+    throw error;
   }
-}
+};
 
-export async function getAllProducts() {
+
+export const getAllProducts = async () => {
   try {
-    const res = await instance.get("/products");
-    return res.data;
+    const response = await api.get('/products');
+    return response.data;
   } catch (error) {
-    console.error("Məhsullar alınarkən xəta:", error);
-    return {};
+    console.error('Error fetching products:', error);
+    throw error;
   }
-}
+};
+
+
+export const fetchProductsByCategory = async (categoryId) => {
+  try {
+    const response = await api.get(`/categories/${categoryId}/products`); 
+    return response.data;
+  } catch (error) {
+    console.error(`Error fetching products for category ${categoryId}:`, error);
+    throw error;
+  }
+};
